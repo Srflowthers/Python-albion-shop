@@ -6,7 +6,22 @@ import webview
 from difflib import get_close_matches
 
 ITEMS_URL = "https://raw.githubusercontent.com/ao-data/ao-bin-dumps/master/formatted/items.json"
-CACHE_FILE = "items_cache.json"
+
+def get_cache_path():
+    if sys.platform == 'win32':
+        app_data = os.environ.get('LOCALAPPDATA') or os.environ.get('APPDATA') or os.path.expanduser('~')
+        dir_path = os.path.join(app_data, 'AlbionMarket')
+    else:
+        dir_path = os.path.expanduser('~/.albionmarket')
+    
+    try:
+        os.makedirs(dir_path, exist_ok=True)
+    except Exception:
+        return "items_cache.json"
+        
+    return os.path.join(dir_path, "items_cache.json")
+
+CACHE_FILE = get_cache_path()
 
 class AlbionAPI:
     def __init__(self):
