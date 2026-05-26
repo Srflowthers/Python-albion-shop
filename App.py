@@ -156,6 +156,22 @@ class AlbionAPI:
             return None
         uname = unique_name.upper()
         
+        resource_keywords = [
+            "_CLOTH", "_LEATHER", "_METALBAR", "_PLANKS", "_STONEBLOCK",
+            "_FIBER", "_ORE", "_HIDE", "_WOOD", "_ROCK"
+        ]
+        if any(kw in uname for kw in resource_keywords):
+            return "6"  # Materiales
+            
+        if "_FOOD" in uname:
+            return "71"  # Comida
+        if "_POTION" in uname:
+            return "72"  # Pociones
+        if "_SKILLBOOK" in uname or "_JOURNAL" in uname:
+            return "73"  # Tomos
+        if any(kw in uname for kw in ["_MAP", "_HELLGATE", "_BAIT", "_CREST", "QUESTITEM_EXP_TOKEN"]):
+            return "74"  # Otros Consumibles
+            
         # Exclude artifacts and tools from equipment categories
         if "_ARTEFACT_" in uname or "_TOOL_" in uname:
             return None
@@ -187,24 +203,31 @@ class AlbionAPI:
         self.id_name_map = {}
         self.search_index = []
         
+        # Pass 1: Populate id_name_map
+        for item in self.items:
+            item_id = item.get("UniqueName", "")
+            if item_id:
+                localized_names = item.get("LocalizedNames") or {}
+                self.id_name_map[item_id] = localized_names.get("ES-ES") or localized_names.get("EN-US") or item_id
+                
         seen_display_names = set()
         
+        # Pass 2: Build groupings and search index
         for item in self.items:
-            localized_names = item.get("LocalizedNames") or {}
-            name_es = localized_names.get("ES-ES", "")
-            name_en = localized_names.get("EN-US", "")
             item_id = item.get("UniqueName", "")
-            
             if not item_id:
                 continue
                 
-            display_name = name_es or name_en or item_id
+            display_name = self.id_name_map[item_id]
             
-            # Map all IDs to their display names
-            self.id_name_map[item_id] = display_name
+            # Base display name resolution (strip level suffix for resources to group them)
+            base_item_id = item_id
+            for lvl in ["_LEVEL1", "_LEVEL2", "_LEVEL3", "_LEVEL4"]:
+                if lvl in base_item_id:
+                    base_item_id = base_item_id.replace(lvl, "")
             
-            # Group all variations (tiers/enchantments) under the base display name
-            base_display_name = clean_base_name(display_name)
+            base_display_name = self.id_name_map.get(base_item_id, display_name)
+            base_display_name = clean_base_name(base_display_name)
             
             if base_display_name not in self.item_map:
                 self.item_map[base_display_name] = []
@@ -216,10 +239,15 @@ class AlbionAPI:
             if not category:
                 continue
                 
-            # Add base item (no enchantment suffix '@') to optimized search index
-            if "@" not in item_id:
+            # Add base item (no enchantment level/suffix) to optimized search index
+            if "@" not in item_id and not any(lvl in item_id for lvl in ["_LEVEL1", "_LEVEL2", "_LEVEL3", "_LEVEL4"]):
                 if base_display_name not in seen_display_names:
                     seen_display_names.add(base_display_name)
+                    
+                    localized_names = item.get("LocalizedNames") or {}
+                    name_es = localized_names.get("ES-ES") or display_name
+                    name_en = localized_names.get("EN-US") or display_name
+                    
                     self.search_index.append({
                         "name_es": clean_base_name(name_es),
                         "name_en": clean_base_name(name_en),
@@ -241,7 +269,7 @@ class AlbionAPI:
         if not query:
             # Return first 10 items of the category sorted alphabetically
             category_items.sort(key=lambda x: x["display_name"])
-            return [x["display_name"] for x in category_items[:10]]
+            return [{"display_name": x["display_name"], "id": x["id"]} for x in category_items[:10]]
             
         scored = []
         for item in category_items:
@@ -251,15 +279,27 @@ class AlbionAPI:
             best_score = max(score_es, score_en, score_id)
             
             if best_score > 0:
-                scored.append((best_score, item["display_name"]))
+                scored.append((best_score, item["display_name"], item["id"]))
                 
         # Sort by score descending, then by display name alphabetically
         scored.sort(key=lambda x: (-x[0], x[1]))
         
-        return [x[1] for x in scored[:10]]
+        return [{"display_name": x[1], "id": x[2]} for x in scored[:10]]
 
     def getPrices(self, selected_name, tier_choice, enc_choice, quality_choice, server):
-        posibles_ids = self.item_map.get(selected_name, [])
+        posibles_ids = []
+        if selected_name in ["HIDE", "FIBER", "ORE", "WOOD", "ROCK", "CLOTH", "LEATHER", "METALBAR", "PLANKS", "STONEBLOCK", "MEAL_STEW", "MEAL_SOUP", "MEAL_SALAD", "MEAL_OMELETTE", "MEAL_SANDWICH", "MEAL_PIE"]:
+            for uid in self.id_name_map.keys():
+                if uid.startswith("T") and "_" in uid:
+                    parts = uid.split("_", 1)
+                    tier_part = parts[0][1:]
+                    if tier_part.isdigit():
+                        rest = parts[1]
+                        if rest == selected_name or rest.startswith(selected_name + "_") or rest.startswith(selected_name + "@"):
+                            posibles_ids.append(uid)
+        else:
+            posibles_ids = self.item_map.get(selected_name, [])
+            
         if not posibles_ids:
             return {"success": False, "error": f"Item '{selected_name}' no encontrado en el catálogo."}
             
@@ -271,10 +311,11 @@ class AlbionAPI:
             
         if enc_choice != "":
             if enc_choice == "0":
-                final_ids = [uid for uid in final_ids if "@" not in uid]
+                final_ids = [uid for uid in final_ids if "@" not in uid and not any(lvl in uid for lvl in ["_LEVEL1", "_LEVEL2", "_LEVEL3", "_LEVEL4"])]
             else:
-                suffix = f"@{enc_choice}"
-                final_ids = [uid for uid in final_ids if uid.endswith(suffix)]
+                suffix_level = f"_LEVEL{enc_choice}"
+                suffix_at = f"@{enc_choice}"
+                final_ids = [uid for uid in final_ids if uid.endswith(suffix_level) or suffix_at in uid or f"{suffix_level}_" in uid]
                 
         if not final_ids:
             return {"success": False, "error": "No se encontraron variaciones con los filtros seleccionados."}
@@ -328,6 +369,11 @@ class AlbionAPI:
                         enc_val = item_id.split("@")[1]
                     except IndexError:
                         pass
+                else:
+                    for lvl in ["1", "2", "3", "4"]:
+                        if f"_LEVEL{lvl}" in item_id:
+                            enc_val = lvl
+                            break
                         
                 formatted_prices.append({
                     "city": p["city"],
@@ -344,15 +390,26 @@ class AlbionAPI:
             mejor_compra = min(prices, key=lambda x: x["sell_price_min"])
             opciones_venta = [x for x in prices if x.get("buy_price_max", 0) > 0]
             
-            parts_best = mejor_compra["item_id"].split("@")
-            tier_best = f'{parts_best[0].split("_")[0]}.{parts_best[1] if len(parts_best) > 1 else "0"}'
+            best_id = mejor_compra["item_id"]
+            best_enc = "0"
+            if "@" in best_id:
+                parts_best = best_id.split("@")
+                best_enc = parts_best[1] if len(parts_best) > 1 else "0"
+            else:
+                for lvl in ["1", "2", "3", "4"]:
+                    if f"_LEVEL{lvl}" in best_id:
+                        best_enc = lvl
+                        break
+            
+            tier_val = best_id.split("_")[0]
+            tier_best = f'{tier_val.split("_")[0][1:]}.{best_enc}'
             
             recommendation = {
                 "buy_city": mejor_compra["city"],
                 "buy_price": mejor_compra["sell_price_min"],
                 "sell_city": "N/A",
                 "sell_price": 0,
-                "tier_label": tier_best,
+                "tier_label": f"T{tier_best}",
                 "quality": mejor_compra.get("quality", 1)
             }
             
@@ -369,6 +426,37 @@ class AlbionAPI:
             
         except Exception as e:
             return {"success": False, "error": f"Error al consultar la API de precios: {str(e)}"}
+
+    def getItemTiers(self, itemName):
+        posibles_ids = []
+        if itemName in ["HIDE", "FIBER", "ORE", "WOOD", "ROCK", "CLOTH", "LEATHER", "METALBAR", "PLANKS", "STONEBLOCK", "MEAL_STEW", "MEAL_SOUP", "MEAL_SALAD", "MEAL_OMELETTE", "MEAL_SANDWICH", "MEAL_PIE"]:
+            for uid in self.id_name_map.keys():
+                if uid.startswith("T") and "_" in uid:
+                    parts = uid.split("_", 1)
+                    tier_part = parts[0][1:]
+                    if tier_part.isdigit():
+                        rest = parts[1]
+                        if rest == itemName or rest.startswith(itemName + "_") or rest.startswith(itemName + "@"):
+                            posibles_ids.append(uid)
+        else:
+            posibles_ids = self.item_map.get(itemName, [])
+        tiers = []
+        seen_tiers = set()
+        
+        for uid in posibles_ids:
+            if "@" not in uid and not any(lvl in uid for lvl in ["_LEVEL1", "_LEVEL2", "_LEVEL3", "_LEVEL4"]):
+                if uid.startswith("T") and "_" in uid:
+                    t_val = uid.split("_")[0][1:]
+                    if t_val not in seen_tiers:
+                        seen_tiers.add(t_val)
+                        name = self.id_name_map.get(uid, uid)
+                        tiers.append({
+                            "tier": t_val,
+                            "id": uid,
+                            "name": name
+                        })
+        tiers.sort(key=lambda x: int(x["tier"]))
+        return tiers
 
     def getRiskRadar(self, server):
         server_urls = {

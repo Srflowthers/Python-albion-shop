@@ -23,8 +23,8 @@ for q in queries:
     results = api.searchItems("1", q)
     print("Search results:")
     for r in results:
-        posibles = api.item_map.get(r, [])
-        print(f"  - '{r}' -> UniqueName sample: {posibles[:3]}")
+        posibles = api.item_map.get(r["display_name"], [])
+        print(f"  - '{r['display_name']}' ({r['id']}) -> UniqueName sample: {posibles[:3]}")
 
 # Test a few other artifact weapons
 other_weapons = ["arco susurrante", "invocador de luz", "daybreaker"]
@@ -33,7 +33,14 @@ for q in other_weapons:
     results = api.searchItems("1", q)
     print("Search results:")
     for r in results:
-        posibles = api.item_map.get(r, [])
-        print(f"  - '{r}' -> UniqueName sample: {posibles[:3]}")
+        posibles = api.item_map.get(r["display_name"], [])
+        print(f"  - '{r['display_name']}' ({r['id']}) -> UniqueName sample: {posibles[:3]}")
+
+# Test Food Tiers lookup
+print("\nTesting Food Tiers lookup for 'MEAL_STEW'...")
+food_tiers = api.getItemTiers("MEAL_STEW")
+print("Food Tiers found:")
+for t in food_tiers:
+    print(f"  - Tier {t['tier']} ({t['id']}): {t['name']}")
 
 print("\nVerification completed successfully!")

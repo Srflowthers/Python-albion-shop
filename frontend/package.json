@@ -11,8 +11,10 @@
   },
   "dependencies": {
     "@tailwindcss/vite": "^4.3.0",
+    "html2canvas": "^1.4.1",
     "react": "^19.2.6",
     "react-dom": "^19.2.6",
+    "react-lazy-load-image-component": "^1.6.3",
     "tailwindcss": "^4.3.0"
   },
   "devDependencies": {

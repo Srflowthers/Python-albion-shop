@@ -1,4 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { LazyLoadImage } from 'react-lazy-load-image-component';
+import 'react-lazy-load-image-component/src/effects/blur.css';
+import html2canvas from 'html2canvas';
 import './App.css';
 
 const QUALITY_NAMES = {
@@ -7,6 +10,50 @@ const QUALITY_NAMES = {
   3: "Sobresaliente",
   4: "Excelente",
   5: "Obra Maestra"
+};
+
+const MATERIALS_LIST = {
+  raw: [
+    { id: "FIBER", name: "Fibra", icon: "🌾", previewId: "T4_FIBER" },
+    { id: "HIDE", name: "Piel", icon: "🐆", previewId: "T4_HIDE" },
+    { id: "ORE", name: "Mineral", icon: "🪨", previewId: "T4_ORE" },
+    { id: "WOOD", name: "Madera", icon: "🪵", previewId: "T4_WOOD" },
+    { id: "ROCK", name: "Piedra", icon: "🧱", previewId: "T4_ROCK" }
+  ],
+  refined: [
+    { id: "CLOTH", name: "Tela", icon: "🧵", previewId: "T4_CLOTH" },
+    { id: "LEATHER", name: "Cuero", icon: "🧥", previewId: "T4_LEATHER" },
+    { id: "METALBAR", name: "Metal", icon: "🪙", previewId: "T4_METALBAR" },
+    { id: "PLANKS", name: "Tablas", icon: "🛷", previewId: "T4_PLANKS" },
+    { id: "STONEBLOCK", name: "Bloques", icon: "🕋", previewId: "T4_STONEBLOCK" }
+  ]
+};
+
+const foodMap = [
+  { name: "guiso", id: "MEAL_STEW" },
+  { name: "sopa", id: "MEAL_SOUP" },
+  { name: "ensalada", id: "MEAL_SALAD" },
+  { name: "omelette", id: "MEAL_OMELETTE" },
+  { name: "sandwich", id: "MEAL_SANDWICH" },
+  { name: "pie", id: "MEAL_PIE" }
+];
+
+const foodIcons = {
+  "MEAL_STEW": "🍲",
+  "MEAL_SOUP": "🍜",
+  "MEAL_SALAD": "🥗",
+  "MEAL_OMELETTE": "🍳",
+  "MEAL_SANDWICH": "🥪",
+  "MEAL_PIE": "🥧"
+};
+
+const foodPreviewIds = {
+  "MEAL_STEW": "T8_MEAL_STEW",
+  "MEAL_SOUP": "T7_MEAL_SOUP",
+  "MEAL_SALAD": "T6_MEAL_SALAD",
+  "MEAL_OMELETTE": "T7_MEAL_OMELETTE",
+  "MEAL_SANDWICH": "T8_MEAL_SANDWICH",
+  "MEAL_PIE": "T7_MEAL_PIE"
 };
 
 // Mock or Native Pywebview API
@@ -63,10 +110,23 @@ const getApi = () => {
         ]
       };
       const items = mockDb[categoryId] || [];
-      if (!query.trim()) return items.slice(0, 10);
-      return items.filter(item => 
-        item.toLowerCase().includes(query.toLowerCase())
-      ).slice(0, 10);
+      const idMap = {
+        "1": "T4_2H_BOW_BADON",
+        "2": "T4_ARMOR_PLATE_SET1",
+        "3": "T4_HEAD_PLATE_SET1",
+        "4": "T4_SHOES_PLATE_SET1",
+        "5": "T4_CAPE"
+      };
+      const itemId = idMap[categoryId] || "T4_CAPE";
+      
+      const filtered = query.trim()
+        ? items.filter(item => item.toLowerCase().includes(query.toLowerCase()))
+        : items;
+        
+      return filtered.slice(0, 10).map(item => ({
+        display_name: item,
+        id: itemId
+      }));
     },
     getPrices: async (selectedName, tierChoice, encChoice, qualityChoice, server) => {
       await new Promise(resolve => setTimeout(resolve, 1000));
@@ -111,6 +171,39 @@ const getApi = () => {
           quality: qualityChoice ? parseInt(qualityChoice) : 1
         }
       };
+    },
+    getItemTiers: async (itemName) => {
+      await new Promise(resolve => setTimeout(resolve, 100));
+      if (["HIDE", "FIBER", "ORE", "WOOD", "ROCK", "CLOTH", "LEATHER", "METALBAR", "PLANKS", "STONEBLOCK", "MEAL_STEW", "MEAL_SOUP", "MEAL_SALAD", "MEAL_OMELETTE", "MEAL_SANDWICH", "MEAL_PIE"].includes(itemName)) {
+        const namesMap = {
+          "HIDE": ["Retales de piel", "Piel tosca", "Piel fina", "Piel mediana", "Piel pesada", "Piel robusta", "Piel gruesa", "Piel resistente"],
+          "FIBER": ["Fibra de cáñamo", "Algodón", "Lino", "Cáñamo", "Cielo", "Fibra celestial", "Fibra de leyenda", "Fibra primordial"],
+          "ORE": ["Mineral", "Hierro", "Titanio", "Runa", "Meteorito", "Adamantio", "Oricalco", "Mitrilo"],
+          "WOOD": ["Madera", "Pino", "Rojo", "Blanco", "Mágico", "Antiguo", "Eldwood", "Legendaria"],
+          "ROCK": ["Roca", "Piedra", "Mármol", "Granito", "Pizarra", "Travertino", "Basalto", "Obsidiana"],
+          "CLOTH": ["Tela", "Lino", "Seda", "Cielo", "Satén", "Terciopelo", "Brocado", "Encaje"],
+          "LEATHER": ["Cuero", "Piel tosca", "Piel fina", "Cuero mediano", "Cuero pesado", "Cuero robusto", "Cuero grueso", "Cuero resistente"],
+          "METALBAR": ["Metal", "Hierro", "Titanio", "Runa", "Meteorito", "Adamantio", "Oricalco", "Mitrilo"],
+          "PLANKS": ["Madera", "Pino", "Rojo", "Blanco", "Mágico", "Antiguo", "Eldwood", "Legendaria"],
+          "STONEBLOCK": ["Roca", "Piedra", "Mármol", "Granito", "Pizarra", "Travertino", "Basalto", "Obsidiana"],
+          "MEAL_STEW": ["", "", "", "Guiso de iniciado", "", "Guiso de maestro", "", "Guiso de anciano"],
+          "MEAL_SOUP": ["", "", "Sopa de trigo", "", "Sopa de col", "", "Sopa de cordero", ""],
+          "MEAL_SALAD": ["", "", "", "Ensalada de iniciado", "", "Ensalada de maestro", "", "Ensalada de anciano"],
+          "MEAL_OMELETTE": ["", "", "Tortilla de trigo", "", "Tortilla de col", "", "Tortilla de cordero", ""],
+          "MEAL_SANDWICH": ["", "", "", "Bocadillo de iniciado", "", "Bocadillo de maestro", "", "Bocadillo de anciano"],
+          "MEAL_PIE": ["", "", "Pastel de trigo", "", "Pastel de col", "", "Pastel de cordero", ""]
+        };
+        const names = namesMap[itemName] || [];
+        return [1, 2, 3, 4, 5, 6, 7, 8].map(t => ({
+          tier: t.toString(),
+          id: `T${t}_${itemName}`,
+          name: names[t - 1] || `${itemName} T${t}`
+        })).filter(x => x.name !== "");
+      }
+      return [
+        { tier: "4", id: "T4_CAPE", name: "Capa de iniciado" },
+        { tier: "5", id: "T5_CAPE", name: "Capa de experto" }
+      ];
     },
     getRiskRadar: async (server) => {
       await new Promise(resolve => setTimeout(resolve, 800));
@@ -229,12 +322,16 @@ function App() {
   const [dbLoading, setDbLoading] = useState(true);
   const [dbError, setDbError] = useState(null);
   
+  const [selectedMainTab, setSelectedMainTab] = useState("equipamiento");
   const [selectedCategory, setSelectedCategory] = useState("1");
   const [searchQuery, setSearchQuery] = useState("");
   const [searchResults, setSearchResults] = useState([]);
   const [searching, setSearching] = useState(false);
   
   const [selectedItem, setSelectedItem] = useState(null);
+  const [itemTiers, setItemTiers] = useState([]);
+  const [materialsRefinedFilter, setMaterialsRefinedFilter] = useState(false);
+  
   const [tier, setTier] = useState("");
   const [enchantment, setEnchantment] = useState("");
   const [quality, setQuality] = useState("");
@@ -250,6 +347,7 @@ function App() {
   const [radarLoading, setRadarLoading] = useState(false);
   const [radarError, setRadarError] = useState(null);
   const [selectedZone, setSelectedZone] = useState(null);
+  const [selectedDeath, setSelectedDeath] = useState(null);
   const [radarSearchQuery, setRadarSearchQuery] = useState("");
   const [radarFilterType, setRadarFilterType] = useState("All"); // "All", "Red Zone", "Black Zone"
   const [radarFilterRisk, setRadarFilterRisk] = useState("All"); // "All", "red", "orange", "yellow", "green"
@@ -327,14 +425,71 @@ function App() {
     setSearchResults([]);
     setSelectedItem(null);
     setPricesData(null);
+    setItemTiers([]);
+    setTier("");
+    setEnchantment("");
+    setQuality("");
   };
 
-  const handleSelectItem = (itemName) => {
+  const handleSelectItem = async (itemName) => {
     setSelectedItem(itemName);
     setTier("");
     setEnchantment("");
     setQuality("");
     setPricesData(null);
+    setItemTiers([]);
+    
+    if (itemName) {
+      try {
+        const tiers = await api.current.getItemTiers(itemName);
+        setItemTiers(tiers || []);
+      } catch (err) {
+        console.error("Error al obtener tiers:", err);
+      }
+    }
+  };
+
+  const handleSelectMainTab = (tab) => {
+    setSelectedMainTab(tab);
+    setSearchQuery("");
+    setSearchResults([]);
+    setSelectedItem(null);
+    setPricesData(null);
+    setItemTiers([]);
+    setTier("");
+    setEnchantment("");
+    setQuality("");
+    
+    if (tab === "equipamiento") {
+      setSelectedCategory("1");
+    } else if (tab === "consumibles") {
+      setSelectedCategory("71");
+    } else if (tab === "materiales") {
+      setSelectedCategory("6");
+    }
+  };
+
+  const getSelectedDisplayName = (item) => {
+    if (!item) return "";
+    const materialsNames = {
+      "FIBER": "Fibra (Sin Refinar)",
+      "HIDE": "Piel (Sin Refinar)",
+      "ORE": "Mineral (Sin Refinar)",
+      "WOOD": "Madera (Sin Refinar)",
+      "ROCK": "Piedra (Sin Refinar)",
+      "CLOTH": "Tela (Refinada)",
+      "LEATHER": "Cuero (Refinado)",
+      "METALBAR": "Metal (Refinado)",
+      "PLANKS": "Tablas (Refinada)",
+      "STONEBLOCK": "Bloques (Refinado)",
+      "MEAL_STEW": "Guiso",
+      "MEAL_SOUP": "Sopa",
+      "MEAL_SALAD": "Ensalada",
+      "MEAL_OMELETTE": "Omelette",
+      "MEAL_SANDWICH": "Sándwich",
+      "MEAL_PIE": "Pastel (Pie)"
+    };
+    return materialsNames[item] || item;
   };
 
   const fetchPrices = async () => {
@@ -442,6 +597,11 @@ function App() {
       <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
       </svg>
+    )},
+    { id: "6", name: "Materiales", icon: (
+      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
+      </svg>
     )}
   ];
 
@@ -531,126 +691,284 @@ function App() {
       {dbLoaded && activeTab === "market" && (
         <main className="flex-1 grid grid-cols-1 lg:grid-cols-12 overflow-hidden">
           {/* LEFT PANEL: Search and Categories */}
-          <section className="lg:col-span-5 border-r border-albion-border/40 bg-slate-950/20 p-5 flex flex-col gap-5 overflow-y-auto">
+          <section className="lg:col-span-5 border-r border-albion-border/40 bg-slate-950/20 p-5 flex flex-col gap-5 lg:overflow-hidden overflow-y-auto relative">
             
-            {/* Category Selector */}
+            {/* Main Category Tabs */}
             <div>
-              <label className="text-[10px] text-slate-400 font-bold uppercase tracking-widest block mb-2.5">1. Seleccionar Categoría</label>
-              <div className="grid grid-cols-3 gap-2 sm:grid-cols-5 lg:grid-cols-3 xl:grid-cols-5">
-                {categories.map(cat => (
-                  <button
-                    key={cat.id}
-                    onClick={() => handleSelectCategory(cat.id)}
-                    className={`flex flex-col items-center justify-center py-2.5 px-2 rounded-md border text-center transition-all duration-300 group ${
-                      selectedCategory === cat.id
-                        ? 'bg-amber-500/10 border-albion-gold text-albion-gold shadow-[0_0_15px_rgba(198,161,82,0.1)]'
-                        : 'bg-slate-900/50 border-albion-border/40 text-slate-400 hover:border-slate-600 hover:text-slate-200'
-                    }`}
-                  >
-                    <div className={`mb-1.5 transition-transform duration-300 group-hover:scale-110 ${selectedCategory === cat.id ? 'text-albion-gold' : 'text-slate-400'}`}>
-                      {cat.icon}
-                    </div>
-                    <span className="text-[10px] font-bold tracking-wide uppercase">{cat.name}</span>
-                  </button>
-                ))}
+              <label className="text-[10px] text-slate-400 font-bold uppercase tracking-widest block mb-2.5">1. Categoría Principal</label>
+              <div className="grid grid-cols-3 gap-2 bg-slate-950/80 border border-albion-border/60 p-1.5 rounded-lg shadow-inner">
+                <button
+                  onClick={() => handleSelectMainTab("equipamiento")}
+                  className={`py-2 px-2 rounded-md text-xs font-bold uppercase tracking-wider transition-all duration-200 cursor-pointer text-center flex flex-col items-center gap-1.5 ${
+                    selectedMainTab === "equipamiento"
+                      ? "bg-amber-500/10 text-albion-gold border border-albion-gold/40 shadow-[0_0_10px_rgba(198,161,82,0.15)]"
+                      : "text-slate-400 hover:text-slate-200 border border-transparent hover:bg-slate-900/40"
+                  }`}
+                >
+                  <span className="text-base">🛡️</span>
+                  <span className="text-[9px] sm:text-[10px]">Equipamiento</span>
+                </button>
+                <button
+                  onClick={() => handleSelectMainTab("consumibles")}
+                  className={`py-2 px-2 rounded-md text-xs font-bold uppercase tracking-wider transition-all duration-200 cursor-pointer text-center flex flex-col items-center gap-1.5 ${
+                    selectedMainTab === "consumibles"
+                      ? "bg-amber-500/10 text-albion-gold border border-albion-gold/40 shadow-[0_0_10px_rgba(198,161,82,0.15)]"
+                      : "text-slate-400 hover:text-slate-200 border border-transparent hover:bg-slate-900/40"
+                  }`}
+                >
+                  <span className="text-base">🧪</span>
+                  <span className="text-[9px] sm:text-[10px]">Consumibles</span>
+                </button>
+                <button
+                  onClick={() => handleSelectMainTab("materiales")}
+                  className={`py-2 px-2 rounded-md text-xs font-bold uppercase tracking-wider transition-all duration-200 cursor-pointer text-center flex flex-col items-center gap-1.5 ${
+                    selectedMainTab === "materiales"
+                      ? "bg-amber-500/10 text-albion-gold border border-albion-gold/40 shadow-[0_0_10px_rgba(198,161,82,0.15)]"
+                      : "text-slate-400 hover:text-slate-200 border border-transparent hover:bg-slate-900/40"
+                  }`}
+                >
+                  <span className="text-base">🪵</span>
+                  <span className="text-[9px] sm:text-[10px]">Materiales</span>
+                </button>
               </div>
             </div>
 
-            {/* Search Input Box */}
-            <div className="flex flex-col gap-1.5">
-              <label className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">2. Buscar Nombre del Ítem</label>
-              <div className="relative">
-                <input
-                  type="text"
-                  placeholder="Ej: Badon, Talla, Hacha..."
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  className="w-full bg-slate-950/80 border border-albion-border/80 focus:border-albion-gold text-sm text-slate-200 pl-4.5 pr-10 py-3 rounded-md outline-none transition-all placeholder-slate-600 font-medium"
-                />
-                <div className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-600">
-                  {searching ? (
-                    <div className="w-4 h-4 border-2 border-slate-600 border-t-albion-gold animate-spin rounded-full"></div>
-                  ) : searchQuery ? (
-                    <button 
-                      onClick={() => setSearchQuery("")}
-                      className="hover:text-slate-300 text-xs font-semibold focus:outline-none"
+            {/* Sub-Category Selector (only shown for Equipamiento) */}
+            {selectedMainTab === "equipamiento" && (
+              <div className="animate-fadeIn">
+                <label className="text-[10px] text-slate-400 font-bold uppercase tracking-widest block mb-2">2. Tipo de Equipamiento</label>
+                <div className="grid grid-cols-5 gap-1.5">
+                  {categories.slice(0, 5).map(cat => (
+                    <button
+                      key={cat.id}
+                      onClick={() => handleSelectCategory(cat.id)}
+                      className={`flex flex-col items-center justify-center py-2 px-1 rounded-md border text-center transition-all duration-300 group cursor-pointer ${
+                        selectedCategory === cat.id
+                          ? 'bg-amber-500/10 border-albion-gold text-albion-gold shadow-[0_0_10px_rgba(198,161,82,0.15)]'
+                          : 'bg-slate-900/50 border-albion-border/40 text-slate-400 hover:border-slate-600 hover:text-slate-200'
+                      }`}
                     >
-                      ✕
+                      <div className={`mb-1 transition-transform duration-300 group-hover:scale-110 ${selectedCategory === cat.id ? 'text-albion-gold' : 'text-slate-400'}`}>
+                        {cat.icon}
+                      </div>
+                      <span className="text-[8px] font-bold tracking-wide uppercase truncate w-full">{cat.name}</span>
                     </button>
-                  ) : (
-                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-                    </svg>
-                  )}
+                  ))}
                 </div>
               </div>
-            </div>
+            )}
 
-            {/* Results Lists */}
-            <div className="flex-1 flex flex-col min-h-[220px]">
-              <label className="text-[10px] text-slate-400 font-bold uppercase tracking-widest block mb-2.5">3. Selecciona el ítem de la Lista</label>
-              <div className="flex-1 bg-slate-950/50 border border-albion-border/30 rounded-md overflow-y-auto max-h-[350px]">
-                {searchResults.length === 0 ? (
-                  <div className="h-full flex flex-col items-center justify-center p-6 text-slate-600 text-center">
-                    <svg className="w-8 h-8 mb-2 stroke-slate-700" fill="none" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-                    </svg>
-                    <p className="text-xs font-semibold">No hay resultados</p>
-                    <p className="text-[10px] text-slate-600 mt-1 max-w-[200px]">Escribe un nombre arriba para iniciar la búsqueda en la base de datos.</p>
-                  </div>
-                ) : (
-                  <div className="divide-y divide-albion-border/20">
-                    {searchResults.map((item, index) => (
+            {/* Sub-Category Selector (only shown for Consumibles) */}
+            {selectedMainTab === "consumibles" && (
+              <div className="animate-fadeIn flex flex-col gap-4">
+                <div>
+                  <label className="text-[10px] text-slate-400 font-bold uppercase tracking-widest block mb-2">2. Tipo de Consumible</label>
+                  <div className="grid grid-cols-4 gap-1.5">
+                    {[
+                      { id: "71", name: "Comida", icon: "🍖" },
+                      { id: "72", name: "Pociones", icon: "🧪" },
+                      { id: "73", name: "Tomos", icon: "📚" },
+                      { id: "74", name: "Otros", icon: "🗺️" }
+                    ].map(cat => (
                       <button
-                        key={index}
-                        onClick={() => handleSelectItem(item)}
-                        className={`w-full text-left px-4 py-3 text-xs font-medium transition-all flex items-center justify-between group ${
-                          selectedItem === item
-                            ? 'bg-amber-500/10 text-albion-gold border-l-2 border-albion-gold'
-                            : 'text-slate-300 hover:bg-slate-900 hover:text-slate-100'
+                        key={cat.id}
+                        onClick={() => handleSelectCategory(cat.id)}
+                        className={`flex flex-col items-center justify-center py-2 px-1 rounded-md border text-center transition-all duration-300 group ${
+                          selectedCategory === cat.id
+                            ? 'bg-amber-500/10 border-albion-gold text-albion-gold shadow-[0_0_10px_rgba(198,161,82,0.15)]'
+                            : 'bg-slate-900/50 border-albion-border/40 text-slate-400 hover:border-slate-600 hover:text-slate-200'
                         }`}
                       >
-                        <span className="truncate pr-2">{item}</span>
-                        <svg className={`w-3.5 h-3.5 stroke-slate-500 group-hover:stroke-albion-gold transition-transform group-hover:translate-x-0.5 ${selectedItem === item ? 'stroke-albion-gold' : ''}`} fill="none" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M9 5l7 7-7 7" />
-                        </svg>
+                        <div className="text-base mb-1 transition-transform duration-300 group-hover:scale-110">
+                          {cat.icon}
+                        </div>
+                        <span className="text-[8px] font-bold tracking-wide uppercase truncate w-full">{cat.name}</span>
                       </button>
                     ))}
                   </div>
+                </div>
+
+                {/* Static Food Grid (only shown when selectedCategory is Comida "71") */}
+                {selectedCategory === "71" && (
+                  <div className="flex flex-col gap-2 animate-fadeIn">
+                    <label className="text-[10px] text-slate-400 font-bold uppercase tracking-widest block">3. Seleccionar Comida</label>
+                    <div className="grid grid-cols-3 gap-2">
+                      {foodMap.map(food => {
+                        const isSelected = selectedItem === food.id;
+                        const previewId = foodPreviewIds[food.id] || `T7_${food.id}`;
+                        const displayName = getSelectedDisplayName(food.id);
+                        return (
+                          <button
+                            key={food.id}
+                            onClick={() => handleSelectItem(food.id)}
+                            className={`flex flex-col items-center justify-center py-2 px-1 rounded-md border text-center transition-all duration-300 group cursor-pointer ${
+                              isSelected
+                                ? 'bg-amber-500/10 border-albion-gold text-albion-gold shadow-[0_0_12px_rgba(198,161,82,0.15)]'
+                                : 'bg-slate-900/50 border-albion-border/40 text-slate-400 hover:border-slate-600 hover:text-slate-200'
+                            }`}
+                          >
+                            <div className="w-10 h-10 rounded bg-slate-950/60 border border-albion-border/30 flex items-center justify-center overflow-hidden mb-1 group-hover:scale-105 transition-transform shrink-0">
+                              <LazyLoadImage
+                                src={`https://render.albiononline.com/v1/item/${previewId}.png`}
+                                effect="blur"
+                                className="w-9 h-9 object-contain"
+                                alt={displayName}
+                              />
+                            </div>
+                            <span className="text-[9px] font-bold tracking-wide uppercase truncate w-full">{displayName}</span>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
                 )}
               </div>
-            </div>
+            )}
 
-            {/* Filters and Search Action */}
+            {/* Materials Toggles and Grid (only shown for Materiales) */}
+            {selectedMainTab === "materiales" && (
+              <div className="flex flex-col gap-4 animate-fadeIn">
+                {/* Raw vs Refined Toggle */}
+                <div className="flex flex-col gap-1.5">
+                  <label className="text-[10px] text-slate-400 font-bold uppercase tracking-widest block">2. Tipo de Recurso</label>
+                  <div className="flex bg-slate-950/80 border border-albion-border/60 p-1 rounded-md">
+                    <button
+                      onClick={() => { setMaterialsRefinedFilter(false); handleSelectItem(null); }}
+                      className={`flex-1 py-1.5 text-[10px] font-bold uppercase tracking-wider rounded transition cursor-pointer ${
+                        !materialsRefinedFilter
+                          ? "bg-amber-500/10 text-albion-gold border border-albion-gold/30"
+                          : "text-slate-400 hover:text-slate-200 border border-transparent"
+                      }`}
+                    >
+                      Sin Refinar (Crudo)
+                    </button>
+                    <button
+                      onClick={() => { setMaterialsRefinedFilter(true); handleSelectItem(null); }}
+                      className={`flex-1 py-1.5 text-[10px] font-bold uppercase tracking-wider rounded transition cursor-pointer ${
+                        materialsRefinedFilter
+                          ? "bg-amber-500/10 text-albion-gold border border-albion-gold/30"
+                          : "text-slate-400 hover:text-slate-200 border border-transparent"
+                      }`}
+                    >
+                      Refinados
+                    </button>
+                  </div>
+                </div>
+
+                {/* Materials Grid */}
+                <div className="flex flex-col gap-2">
+                  <label className="text-[10px] text-slate-400 font-bold uppercase tracking-widest block">3. Seleccionar Material</label>
+                  <div className="grid grid-cols-5 gap-1.5">
+                    {(materialsRefinedFilter ? MATERIALS_LIST.refined : MATERIALS_LIST.raw).map(mat => {
+                      const isSelected = selectedItem === mat.id;
+                      return (
+                        <button
+                          key={mat.id}
+                          onClick={() => handleSelectItem(mat.id)}
+                          className={`flex flex-col items-center justify-center py-2 px-1 rounded-md border text-center transition-all duration-300 group cursor-pointer ${
+                            isSelected
+                              ? 'bg-amber-500/10 border-albion-gold text-albion-gold shadow-[0_0_12px_rgba(198,161,82,0.15)]'
+                              : 'bg-slate-900/50 border-albion-border/40 text-slate-400 hover:border-slate-600 hover:text-slate-200'
+                          }`}
+                        >
+                          <div className="w-10 h-10 rounded bg-slate-950/60 border border-albion-border/30 flex items-center justify-center overflow-hidden mb-1 group-hover:scale-105 transition-transform shrink-0">
+                            <LazyLoadImage
+                              src={`https://render.albiononline.com/v1/item/${mat.previewId}.png`}
+                              effect="blur"
+                              className="w-9 h-9 object-contain"
+                              alt={mat.name}
+                            />
+                          </div>
+                          <span className="text-[9px] font-bold tracking-wide uppercase truncate w-full">{mat.name}</span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Search Input Box (only shown for Equipamiento and Consumibles except Comida) */}
+            {selectedMainTab !== "materiales" && selectedCategory !== "71" && (
+              <div className="flex flex-col gap-1.5">
+                <label className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">2. Buscar Nombre del Ítem</label>
+                <div className="relative">
+                  <input
+                    type="text"
+                    placeholder="Ej: Badon, Talla, Guante..."
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    className="w-full bg-slate-950/80 border border-albion-border/80 focus:border-albion-gold text-sm text-slate-200 pl-4.5 pr-10 py-3 rounded-md outline-none transition-all placeholder-slate-600 font-medium"
+                  />
+                  <div className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-600">
+                    {searching ? (
+                      <div className="w-4 h-4 border-2 border-slate-600 border-t-albion-gold animate-spin rounded-full"></div>
+                    ) : searchQuery ? (
+                      <button 
+                        onClick={() => setSearchQuery("")}
+                        className="hover:text-slate-300 text-xs font-semibold focus:outline-none"
+                      >
+                        ✕
+                      </button>
+                    ) : (
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                      </svg>
+                    )}
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Filters and Search Action - Static/Sticky below selection */}
             {selectedItem && (
-              <div className="bg-slate-950/60 border border-albion-gold/20 p-4 rounded-md flex flex-col gap-4 animate-fadeIn">
-                <div className="border-b border-albion-border/40 pb-2">
-                  <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider block">Seleccionado:</span>
-                  <span className="text-xs font-bold text-albion-gold truncate block mt-0.5">{selectedItem}</span>
+              <div className="bg-slate-950/95 border border-albion-gold/30 p-4 rounded-md flex flex-col gap-4 animate-fadeIn sticky top-0 z-10 shadow-xl backdrop-blur-md">
+                <div className="border-b border-albion-border/40 pb-2 flex justify-between items-center">
+                  <div>
+                    <span className="text-[10px] text-slate-500 font-bold uppercase tracking-wider block">Seleccionado:</span>
+                    <span className="text-xs font-bold text-albion-gold truncate block mt-0.5 max-w-[200px]" title={selectedItem}>
+                      {getSelectedDisplayName(selectedItem)}
+                    </span>
+                  </div>
+                  <button 
+                    onClick={() => handleSelectItem(null)}
+                    className="text-slate-500 hover:text-slate-300 text-xs font-bold p-1 cursor-pointer"
+                    title="Desmarcar"
+                  >
+                    ✕
+                  </button>
                 </div>
                 
                 <div className="grid grid-cols-2 gap-3">
                   <div>
-                    <label className="text-[10px] text-slate-400 font-bold uppercase tracking-widest block mb-1.5">4. Tier (Filtro)</label>
+                    <label className="text-[10px] text-slate-400 font-bold uppercase tracking-widest block mb-1.5">Tier (Filtro)</label>
                     <select
                       value={tier}
                       onChange={(e) => setTier(e.target.value)}
                       className="w-full bg-slate-900 border border-albion-border/60 text-xs text-slate-200 px-3 py-2 rounded-md outline-none focus:border-albion-gold font-semibold"
                     >
                       <option value="">TODOS</option>
-                      <option value="1">Tier 1</option>
-                      <option value="2">Tier 2</option>
-                      <option value="3">Tier 3</option>
-                      <option value="4">Tier 4</option>
-                      <option value="5">Tier 5</option>
-                      <option value="6">Tier 6</option>
-                      <option value="7">Tier 7</option>
-                      <option value="8">Tier 8</option>
+                      {itemTiers && itemTiers.length > 0 ? (
+                        itemTiers.map(t => (
+                          <option key={t.tier} value={t.tier}>{t.name} (T{t.tier})</option>
+                        ))
+                      ) : (
+                        <>
+                          <option value="1">Tier 1</option>
+                          <option value="2">Tier 2</option>
+                          <option value="3">Tier 3</option>
+                          <option value="4">Tier 4</option>
+                          <option value="5">Tier 5</option>
+                          <option value="6">Tier 6</option>
+                          <option value="7">Tier 7</option>
+                          <option value="8">Tier 8</option>
+                        </>
+                      )}
                     </select>
                   </div>
 
                   <div>
-                    <label className="text-[10px] text-slate-400 font-bold uppercase tracking-widest block mb-1.5">5. Encantamiento</label>
+                    <label className="text-[10px] text-slate-400 font-bold uppercase tracking-widest block mb-1.5">Encantamiento</label>
                     <select
                       value={enchantment}
                       onChange={(e) => setEnchantment(e.target.value)}
@@ -666,21 +984,23 @@ function App() {
                   </div>
                 </div>
 
-                <div>
-                  <label className="text-[10px] text-slate-400 font-bold uppercase tracking-widest block mb-1.5">6. Calidad</label>
-                  <select
-                    value={quality}
-                    onChange={(e) => setQuality(e.target.value)}
-                    className="w-full bg-slate-900 border border-albion-border/60 text-xs text-slate-200 px-3 py-2 rounded-md outline-none focus:border-albion-gold font-semibold"
-                  >
-                    <option value="">TODOS</option>
-                    <option value="1">Normal</option>
-                    <option value="2">Bueno (Good)</option>
-                    <option value="3">Sobresaliente (Outstanding)</option>
-                    <option value="4">Excelente (Excellent)</option>
-                    <option value="5">Obra Maestra (Masterpiece)</option>
-                  </select>
-                </div>
+                {selectedCategory !== "6" && !selectedCategory.startsWith("7") && (
+                  <div>
+                    <label className="text-[10px] text-slate-400 font-bold uppercase tracking-widest block mb-1.5">Calidad</label>
+                    <select
+                      value={quality}
+                      onChange={(e) => setQuality(e.target.value)}
+                      className="w-full bg-slate-900 border border-albion-border/60 text-xs text-slate-200 px-3 py-2 rounded-md outline-none focus:border-albion-gold font-semibold"
+                    >
+                      <option value="">TODOS</option>
+                      <option value="1">Normal</option>
+                      <option value="2">Bueno (Good)</option>
+                      <option value="3">Sobresaliente (Outstanding)</option>
+                      <option value="4">Excelente (Excellent)</option>
+                      <option value="5">Obra Maestra (Masterpiece)</option>
+                    </select>
+                  </div>
+                )}
 
                 <button
                   onClick={fetchPrices}
@@ -701,6 +1021,56 @@ function App() {
                     </>
                   )}
                 </button>
+              </div>
+            )}
+
+            {/* Results Lists (only shown for Equipamiento and Consumibles except Comida) */}
+            {selectedMainTab !== "materiales" && selectedCategory !== "71" && (
+              <div className="flex-1 flex flex-col min-h-[220px]">
+                <label className="text-[10px] text-slate-400 font-bold uppercase tracking-widest block mb-2.5">3. Selecciona el ítem de la Lista</label>
+                <div className="flex-1 bg-slate-950/50 border border-albion-border/30 rounded-md overflow-y-auto lg:max-h-[250px] max-h-[350px]">
+                  {searchResults.length === 0 ? (
+                    <div className="h-full flex flex-col items-center justify-center p-6 text-slate-600 text-center">
+                      <svg className="w-8 h-8 mb-2 stroke-slate-700" fill="none" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                      </svg>
+                      <p className="text-xs font-semibold">No hay resultados</p>
+                      <p className="text-[10px] text-slate-600 mt-1 max-w-[200px]">Escribe un nombre arriba para iniciar la búsqueda en la base de datos.</p>
+                    </div>
+                  ) : (
+                    <div className="divide-y divide-albion-border/20">
+                      {searchResults.map((item, index) => {
+                        const isSelected = selectedItem === item.display_name;
+                        return (
+                          <button
+                            key={index}
+                            onClick={() => handleSelectItem(item.display_name)}
+                            className={`w-full text-left px-4 py-2.5 text-xs font-semibold transition-all flex items-center justify-between group cursor-pointer ${
+                              isSelected
+                                ? 'bg-amber-500/10 text-albion-gold border-l-2 border-albion-gold'
+                                : 'text-slate-300 hover:bg-slate-900 hover:text-slate-100'
+                            }`}
+                          >
+                            <div className="flex items-center gap-3 min-w-0">
+                              <div className="w-8 h-8 rounded bg-slate-950/60 border border-albion-border/40 flex items-center justify-center shrink-0 overflow-hidden">
+                                <LazyLoadImage
+                                  src={`https://render.albiononline.com/v1/item/${item.id}.png`}
+                                  effect="blur"
+                                  className="w-7 h-7 object-contain"
+                                  alt={item.display_name}
+                                />
+                              </div>
+                              <span className="truncate pr-2">{item.display_name}</span>
+                            </div>
+                            <svg className={`w-3.5 h-3.5 stroke-slate-500 group-hover:stroke-albion-gold transition-transform group-hover:translate-x-0.5 ${isSelected ? 'stroke-albion-gold' : ''}`} fill="none" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M9 5l7 7-7 7" />
+                            </svg>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
               </div>
             )}
           </section>
@@ -740,7 +1110,7 @@ function App() {
                 <div className="border-b border-albion-border/60 pb-3 flex justify-between items-end">
                   <div>
                     <span className="text-[10px] font-bold text-amber-500 uppercase tracking-widest block">Análisis de Mercado</span>
-                    <h2 className="text-lg font-bold text-slate-100 mt-0.5 font-display tracking-wide">{selectedItem}</h2>
+                    <h2 className="text-lg font-bold text-slate-100 mt-0.5 font-display tracking-wide">{getSelectedDisplayName(selectedItem)}</h2>
                   </div>
                   <span className="bg-amber-500/10 text-albion-gold border border-albion-gold/30 text-[10px] font-bold px-2 py-0.5 rounded font-mono flex items-center gap-1.5">
                     <span>{pricesData.recommendation?.tier_label || "Filtro"}</span>
@@ -876,7 +1246,7 @@ function App() {
       {dbLoaded && activeTab === "radar" && (
         <main className="flex-1 grid grid-cols-1 lg:grid-cols-12 overflow-hidden">
           {/* LEFT PANEL: Zones List and Filters */}
-          <section className="lg:col-span-5 border-r border-albion-border/40 bg-slate-950/20 p-5 flex flex-col gap-5 overflow-y-auto">
+          <section className="lg:col-span-5 border-r border-albion-border/40 bg-slate-950/20 p-5 flex flex-col gap-5 lg:overflow-hidden overflow-y-auto">
             {/* Cabecera del Radar */}
             <div className="flex flex-col gap-2 border-b border-albion-border/40 pb-3">
               <div className="flex justify-between items-center">
@@ -979,7 +1349,7 @@ function App() {
               )}
 
               {radarData && (
-                <div className="flex-1 bg-slate-950/50 border border-albion-border/30 rounded-md overflow-y-auto max-h-[420px] divide-y divide-albion-border/20">
+                <div className="flex-1 bg-slate-950/50 border border-albion-border/30 rounded-md overflow-y-auto lg:max-h-[320px] max-h-[420px] divide-y divide-albion-border/20">
                   {radarData.zones
                     .filter(z => {
                       const matchSearch = z.name.toLowerCase().includes(radarSearchQuery.toLowerCase());
@@ -1171,7 +1541,11 @@ function App() {
                       {selectedZone.deaths.map((death, i) => {
                         const dateStr = death.timestamp ? new Date(death.timestamp).toLocaleTimeString() : "";
                         return (
-                          <div key={i} className="bg-slate-900/60 border border-albion-border/40 hover:border-albion-border/80 rounded-lg p-4 flex flex-col gap-3.5 transition duration-150">
+                          <div 
+                            key={i} 
+                            onClick={() => setSelectedDeath(death)}
+                            className="bg-slate-900/60 border border-albion-border/40 hover:border-albion-gold/40 hover:bg-slate-900/80 rounded-lg p-4 flex flex-col gap-3.5 transition duration-150 cursor-pointer group/death relative"
+                          >
                             {/* Línea Principal (Asesino y Víctima) */}
                             <div className="flex justify-between items-start gap-4">
                               <div className="min-w-0 flex-1">
@@ -1186,12 +1560,16 @@ function App() {
                                     <span className="text-[10px] text-slate-400">[{death.victim_guild}]</span>
                                   )}
                                 </div>
-                                <div className="flex items-center gap-2 mt-1 text-[10px] text-slate-500 font-medium">
+                                <div className="flex items-center gap-2 mt-1 text-[10px] text-slate-500 font-medium flex-wrap">
                                   <span>Gankers: {death.group_size}</span>
                                   <span>•</span>
                                   <span>Fama Perdida: <span className="font-mono text-amber-500/80">{formatSilver(death.fame)}</span></span>
                                   <span>•</span>
                                   <span>Hora: {dateStr}</span>
+                                  <span>•</span>
+                                  <span className="px-2 py-0.5 bg-amber-500/10 hover:bg-albion-gold text-albion-gold hover:text-slate-950 border border-albion-gold/30 hover:border-transparent rounded text-[9px] font-bold transition duration-150 uppercase tracking-wider flex items-center gap-1">
+                                    Ver Detalles 💀
+                                  </span>
                                 </div>
                               </div>
 
@@ -1208,14 +1586,30 @@ function App() {
                                 <div className="flex flex-wrap gap-1.5 max-h-[80px] overflow-y-auto pr-1">
                                   {/* Mostrar Equipamiento */}
                                   {death.equipment.map((item, idx) => (
-                                    <span key={`eq-${idx}`} className="text-[9px] font-semibold bg-slate-950/80 border border-albion-gold/20 text-slate-300 px-2 py-1 rounded" title={item.id}>
-                                      🛡️ {item.name} {item.count > 1 ? `x${item.count}` : ""}
+                                    <span key={`eq-${idx}`} className="text-[9px] font-semibold bg-slate-950/80 border border-albion-gold/20 text-slate-300 px-2 py-1 rounded flex items-center gap-1.5" title={item.id}>
+                                      <div className="w-5 h-5 flex items-center justify-center shrink-0 overflow-hidden">
+                                        <LazyLoadImage
+                                          src={`https://render.albiononline.com/v1/item/${item.id}.png`}
+                                          effect="blur"
+                                          className="w-5 h-5 object-contain"
+                                          alt={item.name}
+                                        />
+                                      </div>
+                                      <span className="truncate max-w-[90px]">{item.name} {item.count > 1 ? `x${item.count}` : ""}</span>
                                     </span>
                                   ))}
                                   {/* Mostrar Inventario */}
                                   {death.inventory.map((item, idx) => (
-                                    <span key={`inv-${idx}`} className="text-[9px] font-medium bg-slate-950/40 border border-slate-800 text-slate-400 px-2 py-1 rounded" title={item.id}>
-                                      📦 {item.name} {item.count > 1 ? `x${item.count}` : ""}
+                                    <span key={`inv-${idx}`} className="text-[9px] font-medium bg-slate-950/40 border border-slate-800 text-slate-400 px-2 py-1 rounded flex items-center gap-1.5" title={item.id}>
+                                      <div className="w-5 h-5 flex items-center justify-center shrink-0 overflow-hidden">
+                                        <LazyLoadImage
+                                          src={`https://render.albiononline.com/v1/item/${item.id}.png`}
+                                          effect="blur"
+                                          className="w-5 h-5 object-contain"
+                                          alt={item.name}
+                                        />
+                                      </div>
+                                      <span className="truncate max-w-[90px]">{item.name} {item.count > 1 ? `x${item.count}` : ""}</span>
                                     </span>
                                   ))}
                                 </div>
@@ -1262,6 +1656,230 @@ function App() {
           Conectado con <a href="https://www.albion-online-data.com/" target="_blank" className="text-albion-gold hover:underline">Albion Online Data Project</a>
         </div>
       </footer>
+
+      {/* MODAL DE DETALLE DE MUERTE */}
+      {selectedDeath && (() => {
+        const eqMap = {};
+        selectedDeath.equipment.forEach(item => {
+          eqMap[item.slot] = item;
+        });
+
+        const slotsLayout = [
+          [ { slot: "Bag", label: "Bolsa", icon: "🎒" }, { slot: "Head", label: "Cabeza", icon: "🪖" }, { slot: "Cape", label: "Capa", icon: "🧣" } ],
+          [ { slot: "MainHand", label: "Mano Principal", icon: "⚔️" }, { slot: "Armor", label: "Pecho", icon: "👕" }, { slot: "OffHand", label: "Mano Secundaria", icon: "🛡️" } ],
+          [ { slot: "Food", label: "Comida", icon: "🍖" }, { slot: "Shoes", label: "Pies", icon: "🥾" }, { slot: "Potion", label: "Poción", icon: "🧪" } ],
+          [ null, { slot: "Mount", label: "Montura", icon: "🐴" }, null ]
+        ];
+
+        const downloadScreenshot = () => {
+          const element = document.getElementById("kill-card-screenshot");
+          if (!element) return;
+          
+          html2canvas(element, {
+            useCORS: true,
+            backgroundColor: "#0a0c10",
+            scale: 2
+          }).then(canvas => {
+            const link = document.createElement("a");
+            link.download = `muerte_${selectedDeath.victim_name}_${selectedDeath.event_id}.png`;
+            link.href = canvas.toDataURL("image/png");
+            link.click();
+          }).catch(err => {
+            console.error("Error al generar captura:", err);
+            alert("No se pudo generar la captura. Inténtelo de nuevo.");
+          });
+        };
+
+        const dateStr = selectedDeath.timestamp ? new Date(selectedDeath.timestamp).toLocaleString() : "N/D";
+
+        const totalItemsCount = selectedDeath.equipment.reduce((sum, item) => sum + (item.count || 1), 0) +
+                                selectedDeath.inventory.reduce((sum, item) => sum + (item.count || 1), 0);
+
+        const getQualityBorderClass = (quality) => {
+          switch(quality) {
+            case 2: return "border-emerald-500/50 shadow-[0_0_8px_rgba(16,185,129,0.2)] bg-slate-950 hover:border-emerald-400"; // Bueno
+            case 3: return "border-blue-500/50 shadow-[0_0_8px_rgba(59,130,246,0.2)] bg-slate-950 hover:border-blue-400";   // Sobresaliente
+            case 4: return "border-purple-500/50 shadow-[0_0_8px_rgba(168,85,247,0.2)] bg-slate-950 hover:border-purple-400"; // Excelente
+            case 5: return "border-amber-500/70 shadow-[0_0_10px_rgba(245,158,11,0.3)] bg-slate-950 hover:border-amber-400"; // Obra Maestra
+            default: return "border-slate-700 bg-slate-950 hover:border-slate-500"; // Normal / Default
+          }
+        };
+
+        return (
+          <div className="fixed inset-0 bg-black/85 backdrop-blur-md z-50 overflow-y-auto flex justify-center items-start p-4 animate-fadeIn">
+            <div className="bg-slate-950 border border-albion-gold/40 rounded-lg max-w-3xl w-full shadow-2xl relative flex flex-col my-8">
+              
+              {/* Controles de Cabecera del Modal (No se capturan) */}
+              <div className="flex justify-between items-center px-6 py-4 border-b border-albion-border/60 bg-slate-950">
+                <h3 className="text-sm font-bold uppercase tracking-widest text-slate-300 flex items-center gap-2">
+                  <span>💀</span> Detalle de Combate PvP
+                </h3>
+                <div className="flex items-center gap-3">
+                  <button
+                    onClick={downloadScreenshot}
+                    className="px-3.5 py-1.5 bg-amber-500/10 hover:bg-amber-500 hover:text-slate-950 border border-albion-gold/30 hover:border-amber-400 rounded text-xs font-bold uppercase tracking-wider transition duration-150 flex items-center gap-2 cursor-pointer"
+                  >
+                    <span>📷</span> Descargar Captura
+                  </button>
+                  <button
+                    onClick={() => setSelectedDeath(null)}
+                    className="text-slate-400 hover:text-slate-100 text-lg font-bold p-1 cursor-pointer"
+                  >
+                    ✕
+                  </button>
+                </div>
+              </div>
+
+              {/* Contenedor Capturable de la Ficha de Muerte */}
+              <div id="kill-card-screenshot" className="p-6 flex flex-col gap-6 bg-slate-950 text-slate-100">
+                
+                {/* Cabecera del Combate */}
+                <div className="flex justify-between items-center border-b border-albion-border/40 pb-4 flex-wrap gap-4">
+                  <div>
+                    <span className="text-[10px] text-slate-500 font-bold uppercase tracking-wider block">Víctima</span>
+                    <span className="text-base font-bold text-slate-200">{selectedDeath.victim_name}</span>
+                    {selectedDeath.victim_guild && (
+                      <span className="text-xs text-slate-400 block mt-0.5">Guild: [{selectedDeath.victim_guild}] {selectedDeath.victim_alliance ? `[${selectedDeath.victim_alliance}]` : ''}</span>
+                    )}
+                  </div>
+                  <div className="text-center bg-red-950/20 border border-red-500/30 px-4 py-2 rounded">
+                    <span className="text-[10px] text-red-400 font-bold uppercase tracking-widest block">Fama de Muerte</span>
+                    <span className="text-lg font-bold text-red-500 font-mono">{formatSilver(selectedDeath.fame)}</span>
+                  </div>
+                  <div className="text-right">
+                    <span className="text-[10px] text-slate-500 font-bold uppercase tracking-wider block">Asesino Principal</span>
+                    <span className="text-base font-bold text-red-400">{selectedDeath.killer_name}</span>
+                    {selectedDeath.killer_guild && (
+                      <span className="text-xs text-slate-400 block mt-0.5">Guild: [{selectedDeath.killer_guild}] {selectedDeath.killer_alliance ? `[${selectedDeath.killer_alliance}]` : ''}</span>
+                    )}
+                  </div>
+                </div>
+
+                {/* Grid de Equipamiento e Inventario */}
+                <div className="grid grid-cols-1 md:grid-cols-12 gap-6 items-start">
+                  
+                  {/* Vista de Equipamiento (Albion Style Grid) */}
+                  <div className="md:col-span-6 flex flex-col items-center gap-3">
+                    <span className="text-[9px] font-bold text-slate-400 uppercase tracking-widest block text-center">Como iba Equipado (IP: {selectedDeath.victim_ip})</span>
+                    <div className="bg-slate-900/40 border border-albion-border/60 rounded-lg p-5 w-full max-w-[280px] flex flex-col items-center justify-center gap-3 relative shadow-inner">
+                      
+                      {slotsLayout.map((row, rIdx) => (
+                        <div key={rIdx} className="flex gap-3 justify-center items-center">
+                          {row.map((slotInfo, sIdx) => {
+                            if (!slotInfo) return <div key={sIdx} className="w-14 h-14 invisible"></div>;
+                            const item = eqMap[slotInfo.slot];
+                            const qClass = item ? getQualityBorderClass(item.quality) : "bg-slate-950/20 border-slate-800/80 text-slate-600";
+                            
+                            return (
+                              <div 
+                                key={sIdx}
+                                className={`w-14 h-14 rounded-md border flex flex-col items-center justify-center relative overflow-hidden group/slot ${qClass}`}
+                                title={item ? `${item.name} (${slotInfo.label}) - ${QUALITY_NAMES[item.quality] || 'Normal'}` : slotInfo.label}
+                              >
+                                {item ? (
+                                  <>
+                                    <LazyLoadImage
+                                      src={`https://render.albiononline.com/v1/item/${item.id}.png`}
+                                      effect="blur"
+                                      className="w-12 h-12 object-contain"
+                                      alt={item.name}
+                                    />
+                                    {item.count > 1 && (
+                                      <span className="absolute bottom-0.5 right-1 text-[9px] font-mono font-bold bg-slate-950/90 text-amber-400 px-1 rounded border border-albion-gold/20 leading-none">
+                                        x{item.count}
+                                      </span>
+                                    )}
+                                  </>
+                                ) : (
+                                  <div className="flex flex-col items-center justify-center">
+                                    <span className="text-base opacity-40">{slotInfo.icon}</span>
+                                    <span className="text-[8px] uppercase tracking-wide opacity-20 font-bold mt-0.5 scale-90">{slotInfo.label}</span>
+                                  </div>
+                                )}
+                              </div>
+                            );
+                          })}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Inventario Perdido */}
+                  <div className="md:col-span-6 flex flex-col gap-3 h-full">
+                    <span className="text-[9px] font-bold text-slate-400 uppercase tracking-widest block">Inventario Perdido ({selectedDeath.inventory.length} ranuras)</span>
+                    <div className="bg-slate-900/20 border border-albion-border/40 rounded-lg p-4 flex-1 max-h-[290px] overflow-y-auto min-h-[220px]">
+                      {selectedDeath.inventory.length === 0 ? (
+                        <div className="h-full flex flex-col items-center justify-center text-center text-slate-600">
+                          <span className="text-lg">🎒</span>
+                          <span className="text-[10px] font-bold uppercase tracking-wider mt-1">Inventario Vacío</span>
+                          <p className="text-[9px] text-slate-600 max-w-[150px] mt-0.5">La víctima no llevaba ningún ítem suelto en su mochila.</p>
+                        </div>
+                      ) : (
+                        <div className="grid grid-cols-4 gap-2">
+                          {selectedDeath.inventory.map((item, idx) => {
+                            const invQClass = getQualityBorderClass(item.quality);
+                            return (
+                              <div 
+                                key={idx}
+                                className={`w-12 h-12 rounded border flex items-center justify-center relative overflow-hidden group/inv ${invQClass}`}
+                                title={`${item.name} x${item.count} (${QUALITY_NAMES[item.quality] || 'Normal'})`}
+                              >
+                                <LazyLoadImage
+                                  src={`https://render.albiononline.com/v1/item/${item.id}.png`}
+                                  effect="blur"
+                                  className="w-10 h-10 object-contain"
+                                  alt={item.name}
+                                />
+                                {item.count > 1 && (
+                                  <span className="absolute bottom-0.5 right-0.5 text-[8px] font-mono font-bold bg-slate-950/90 text-slate-300 px-0.5 rounded leading-none">
+                                    {item.count}
+                                  </span>
+                                )}
+                              </div>
+                            );
+                          })}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                </div>
+
+                {/* Comparación de Estadísticas de Combate */}
+                <div className="bg-slate-900/40 border border-albion-border/60 rounded-lg p-4 flex flex-col gap-3.5">
+                  <h4 className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Información Adicional del Encuentro</h4>
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 text-xs font-semibold">
+                    <div className="flex flex-col gap-1 bg-slate-950/40 border border-albion-border/30 px-3.5 py-2.5 rounded-md">
+                      <span className="text-[9px] text-slate-500 font-bold uppercase tracking-wider">Fecha y Hora</span>
+                      <span className="text-slate-300 font-mono text-[11px] truncate">{dateStr}</span>
+                    </div>
+                    <div className="flex flex-col gap-1 bg-slate-950/40 border border-albion-border/30 px-3.5 py-2.5 rounded-md">
+                      <span className="text-[9px] text-slate-500 font-bold uppercase tracking-wider">Asesinos Involucrados</span>
+                      <span className="text-amber-500">{selectedDeath.group_size} {selectedDeath.group_size === 1 ? 'ganker' : 'gankers'}</span>
+                    </div>
+                    <div className="flex flex-col gap-1 bg-slate-950/40 border border-albion-border/30 px-3.5 py-2.5 rounded-md">
+                      <span className="text-[9px] text-slate-500 font-bold uppercase tracking-wider">Gear del Asesino</span>
+                      <span className="text-red-400 font-mono">{selectedDeath.killer_ip} IP</span>
+                    </div>
+                    <div className="flex flex-col gap-1 bg-slate-950/40 border border-albion-border/30 px-3.5 py-2.5 rounded-md">
+                      <span className="text-[9px] text-slate-500 font-bold uppercase tracking-wider">Total Objetos Perdidos</span>
+                      <span className="text-amber-400 font-mono">{totalItemsCount} {totalItemsCount === 1 ? 'ítem' : 'ítems'}</span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Footer de la Captura */}
+                <div className="border-t border-albion-border/40 pt-3 flex justify-between items-center text-[9px] text-slate-600 font-semibold tracking-wider uppercase">
+                  <span>Albion Market PvP Radar v1.0.0</span>
+                  <span>Servidor: {server.toUpperCase()}</span>
+                </div>
+
+              </div>
+
+            </div>
+          </div>
+        );
+      })()}
     </div>
   );
 }
