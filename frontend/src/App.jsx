@@ -111,6 +111,115 @@ const getApi = () => {
           quality: qualityChoice ? parseInt(qualityChoice) : 1
         }
       };
+    },
+    getRiskRadar: async (server) => {
+      await new Promise(resolve => setTimeout(resolve, 800));
+      const mockZones = [
+        {
+          name: "Redtree Enclave",
+          type: "Black Zone",
+          death_count: 8,
+          avg_group_size: 4.5,
+          avg_killer_ip: 1420.5,
+          risk_level: "red",
+          survival_gathering: 35,
+          survival_farming: 30,
+          survival_transport: 25,
+          deaths: [
+            {
+              event_id: 1234567,
+              victim_name: "GankerHunter99",
+              victim_guild: "Arch",
+              victim_alliance: "ARCH",
+              victim_ip: 1100.0,
+              killer_name: "PvPMaster",
+              killer_guild: "Dune",
+              killer_alliance: "DUNE",
+              killer_ip: 1450.0,
+              group_size: 3,
+              fame: 15400,
+              timestamp: new Date(Date.now() - 3 * 60000).toISOString(),
+              inventory: [{ name: "T8_FIBER", count: 40, quality: 1 }],
+              equipment: [{ slot: "MainHand", name: "Doble Daga del Experto", count: 1, quality: 3 }]
+            }
+          ]
+        },
+        {
+          name: "Creag Garr",
+          type: "Red Zone",
+          death_count: 4,
+          avg_group_size: 2.1,
+          avg_killer_ip: 1150.0,
+          risk_level: "orange",
+          survival_gathering: 65,
+          survival_farming: 60,
+          survival_transport: 55,
+          deaths: [
+            {
+              event_id: 1234568,
+              victim_name: "TraderJoe",
+              victim_guild: "Mercenarios",
+              victim_alliance: "",
+              victim_ip: 850.0,
+              killer_name: "RedPlayer",
+              killer_guild: "PKs",
+              killer_alliance: "",
+              killer_ip: 1200.0,
+              group_size: 2,
+              fame: 4500,
+              timestamp: new Date(Date.now() - 8 * 60000).toISOString(),
+              inventory: [],
+              equipment: []
+            }
+          ]
+        },
+        {
+          name: "Lymhurst Portal Area",
+          type: "Black Zone",
+          death_count: 1,
+          avg_group_size: 1.0,
+          avg_killer_ip: 1050.0,
+          risk_level: "yellow",
+          survival_gathering: 85,
+          survival_farming: 88,
+          survival_transport: 80,
+          deaths: [
+            {
+              event_id: 1234569,
+              victim_name: "GathererPro",
+              victim_guild: "Woodcutters",
+              victim_alliance: "",
+              victim_ip: 1000.0,
+              killer_name: "SoloGanker",
+              killer_guild: "LoneWolves",
+              killer_alliance: "",
+              killer_ip: 1100.0,
+              group_size: 1,
+              fame: 2000,
+              timestamp: new Date(Date.now() - 15 * 60000).toISOString(),
+              inventory: [],
+              equipment: []
+            }
+          ]
+        },
+        {
+          name: "Bridgewatch Portal Area",
+          type: "Black Zone",
+          death_count: 0,
+          avg_group_size: 0,
+          avg_killer_ip: 0,
+          risk_level: "green",
+          survival_gathering: 98,
+          survival_farming: 99,
+          survival_transport: 96,
+          deaths: []
+        }
+      ];
+      return {
+        success: true,
+        zones: mockZones,
+        total_kills: 13
+      };
     }
   };
 };
@@ -134,6 +243,18 @@ function App() {
   const [pricesLoading, setPricesLoading] = useState(false);
   const [pricesData, setPricesData] = useState(null);
   const [pricesError, setPricesError] = useState(null);
+
+  // Estados del Risk Radar PvP
+  const [activeTab, setActiveTab] = useState("market"); // "market" o "radar"
+  const [radarData, setRadarData] = useState(null);
+  const [radarLoading, setRadarLoading] = useState(false);
+  const [radarError, setRadarError] = useState(null);
+  const [selectedZone, setSelectedZone] = useState(null);
+  const [radarSearchQuery, setRadarSearchQuery] = useState("");
+  const [radarFilterType, setRadarFilterType] = useState("All"); // "All", "Red Zone", "Black Zone"
+  const [radarFilterRisk, setRadarFilterRisk] = useState("All"); // "All", "red", "orange", "yellow", "green"
+  const [lastRadarUpdate, setLastRadarUpdate] = useState(null);
+  const [refreshCountdown, setRefreshCountdown] = useState(45);
 
   const api = useRef(null);
 
@@ -235,6 +356,59 @@ function App() {
     }
   };
 
+  const fetchRadar = async (showLoading = true) => {
+    if (!api.current) return;
+    if (showLoading) setRadarLoading(true);
+    setRadarError(null);
+    try {
+      const res = await api.current.getRiskRadar(server);
+      if (res.success) {
+        setRadarData(res);
+        setLastRadarUpdate(new Date());
+        
+        setSelectedZone(current => {
+          if (current) {
+            const updated = res.zones.find(z => z.name === current.name);
+            return updated || res.zones[0] || null;
+          }
+          return res.zones[0] || null;
+        });
+      } else {
+        setRadarError(res.error || "Error al obtener los datos del Radar.");
+      }
+    } catch (err) {
+      setRadarError("Error de conexión al obtener los eventos de PvP.");
+      console.error(err);
+    } finally {
+      if (showLoading) setRadarLoading(false);
+    }
+  };
+
+  // Cargar datos al cambiar de pestaña, de servidor o base de datos lista
+  useEffect(() => {
+    if (activeTab === "radar" && dbLoaded) {
+      fetchRadar(true);
+      setRefreshCountdown(45);
+    }
+  }, [activeTab, server, dbLoaded]);
+
+  // Manejar la cuenta regresiva e invocar recarga silenciosa
+  useEffect(() => {
+    if (activeTab !== "radar" || !dbLoaded) return;
+
+    const timer = setInterval(() => {
+      setRefreshCountdown(prev => {
+        if (prev <= 1) {
+          fetchRadar(false);
+          return 45;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+
+    return () => clearInterval(timer);
+  }, [activeTab, server, dbLoaded]);
+
   // Formatear números a plata (plata)
   const formatSilver = (num) => {
     if (!num) return "0";
@@ -284,6 +458,34 @@ function App() {
             <p className="text-[10px] text-slate-500 uppercase tracking-widest font-semibold mt-0.5">Analizador de Precios de Escritorio</p>
           </div>
         </div>
+
+        {/* Tab Selector */}
+        <div className="flex items-center gap-1 bg-slate-950 border border-albion-border/60 p-1 rounded-md">
+          <button
+            onClick={() => setActiveTab("market")}
+            className={`px-4 py-1.5 rounded text-xs font-bold uppercase tracking-wider transition duration-200 cursor-pointer ${
+              activeTab === "market"
+                ? "bg-amber-500/10 text-albion-gold border border-albion-gold/40 shadow-[0_0_10px_rgba(198,161,82,0.1)]"
+                : "text-slate-400 hover:text-slate-200 border border-transparent"
+            }`}
+          >
+            Mercado
+          </button>
+          <button
+            onClick={() => setActiveTab("radar")}
+            className={`px-4 py-1.5 rounded text-xs font-bold uppercase tracking-wider transition duration-200 cursor-pointer flex items-center gap-2 ${
+              activeTab === "radar"
+                ? "bg-amber-500/10 text-albion-gold border border-albion-gold/40 shadow-[0_0_10px_rgba(198,161,82,0.1)]"
+                : "text-slate-400 hover:text-slate-200 border border-transparent"
+            }`}
+          >
+            <span className="relative flex h-2 w-2">
+              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
+              <span className="relative inline-flex rounded-full h-2 w-2 bg-red-500"></span>
+            </span>
+            Radar PvP
+          </button>
+        </div>
         
         {/* Server Selection */}
         <div className="flex items-center gap-2 bg-slate-900 border border-albion-border/80 px-3 py-1.5 rounded-md">
@@ -326,7 +528,7 @@ function App() {
         </div>
       )}
 
-      {dbLoaded && (
+      {dbLoaded && activeTab === "market" && (
         <main className="flex-1 grid grid-cols-1 lg:grid-cols-12 overflow-hidden">
           {/* LEFT PANEL: Search and Categories */}
           <section className="lg:col-span-5 border-r border-albion-border/40 bg-slate-950/20 p-5 flex flex-col gap-5 overflow-y-auto">
@@ -607,7 +809,6 @@ function App() {
                       <table className="w-full text-left border-collapse">
                         <thead>
                           <tr className="bg-slate-950 border-b border-albion-border/50 text-[10px] text-slate-400 uppercase font-bold tracking-wider">
-                            <th className="py-3 px-4">Ítem</th>
                             <th className="py-3 px-4">Ciudad</th>
                             <th className="py-3 px-4">Calidad</th>
                             <th className="py-3 px-4 text-center">Tier</th>
@@ -628,9 +829,6 @@ function App() {
                                   isCheapestBuy ? 'bg-amber-950/20' : isBestSell ? 'bg-emerald-950/20' : ''
                                 }`}
                               >
-                                <td className="py-3.5 px-4 font-bold text-slate-100 truncate max-w-[180px]" title={p.name}>
-                                  {p.name || selectedItem}
-                                </td>
                                 <td className="py-3.5 px-4 font-bold flex items-center gap-2">
                                   <span className="text-slate-100">{p.city}</span>
                                   {isCheapestBuy && (
@@ -669,6 +867,371 @@ function App() {
                   <span>Los datos de precios son recuperados directamente de las bases de datos descentralizadas de <strong>Albion Online Data Project</strong>. Es posible que existan discrepancias temporales con el mercado en tiempo real dentro del juego.</span>
                 </div>
 
+              </div>
+            )}
+          </section>
+        </main>
+      )}
+
+      {dbLoaded && activeTab === "radar" && (
+        <main className="flex-1 grid grid-cols-1 lg:grid-cols-12 overflow-hidden">
+          {/* LEFT PANEL: Zones List and Filters */}
+          <section className="lg:col-span-5 border-r border-albion-border/40 bg-slate-950/20 p-5 flex flex-col gap-5 overflow-y-auto">
+            {/* Cabecera del Radar */}
+            <div className="flex flex-col gap-2 border-b border-albion-border/40 pb-3">
+              <div className="flex justify-between items-center">
+                <h2 className="text-sm font-bold uppercase tracking-widest text-slate-400">Risk Radar PvP</h2>
+                <div className="flex items-center gap-2">
+                  <span className="text-[10px] text-slate-500 font-mono">Auto-refresco: {refreshCountdown}s</span>
+                  <button
+                    onClick={() => fetchRadar(true)}
+                    disabled={radarLoading}
+                    className="p-1 bg-slate-900 border border-albion-border/80 hover:border-albion-gold text-slate-400 hover:text-albion-gold rounded text-xs transition cursor-pointer"
+                    title="Actualizar ahora"
+                  >
+                    {radarLoading ? (
+                      <div className="w-3.5 h-3.5 border-2 border-slate-400 border-t-transparent animate-spin rounded-full"></div>
+                    ) : (
+                      "🔄"
+                    )}
+                  </button>
+                </div>
+              </div>
+              <div className="flex justify-between items-center text-[10px]">
+                <span className="text-slate-500 font-medium">
+                  Última actualización: {lastRadarUpdate ? lastRadarUpdate.toLocaleTimeString() : "N/D"}
+                </span>
+                <span className="text-amber-500 font-semibold font-mono uppercase tracking-wider">
+                  {server.toUpperCase()} Server
+                </span>
+              </div>
+            </div>
+
+            {/* Buscador y Filtros */}
+            <div className="flex flex-col gap-3">
+              <div className="relative">
+                <input
+                  type="text"
+                  placeholder="Buscar mapa..."
+                  value={radarSearchQuery}
+                  onChange={(e) => setRadarSearchQuery(e.target.value)}
+                  className="w-full bg-slate-950/80 border border-albion-border/80 focus:border-albion-gold text-xs text-slate-200 pl-4.5 pr-8 py-2.5 rounded-md outline-none transition-all placeholder-slate-600 font-semibold"
+                />
+                {radarSearchQuery && (
+                  <button
+                    onClick={() => setRadarSearchQuery("")}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-600 hover:text-slate-300 text-[10px] font-bold"
+                  >
+                    ✕
+                  </button>
+                )}
+              </div>
+
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <label className="text-[9px] text-slate-400 font-bold uppercase tracking-widest block mb-1">Zona</label>
+                  <select
+                    value={radarFilterType}
+                    onChange={(e) => setRadarFilterType(e.target.value)}
+                    className="w-full bg-slate-900 border border-albion-border/60 text-[11px] text-slate-300 px-2 py-1.5 rounded outline-none focus:border-albion-gold font-bold"
+                  >
+                    <option value="All">TODAS</option>
+                    <option value="Red Zone">Zona Roja</option>
+                    <option value="Black Zone">Zona Negra</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="text-[9px] text-slate-400 font-bold uppercase tracking-widest block mb-1">Riesgo</label>
+                  <select
+                    value={radarFilterRisk}
+                    onChange={(e) => setRadarFilterRisk(e.target.value)}
+                    className="w-full bg-slate-900 border border-albion-border/60 text-[11px] text-slate-300 px-2 py-1.5 rounded outline-none focus:border-albion-gold font-bold"
+                  >
+                    <option value="All">TODOS</option>
+                    <option value="red">Extremo (Rojo)</option>
+                    <option value="orange">Peligroso (Naranja)</option>
+                    <option value="yellow">Precaución (Amarillo)</option>
+                    <option value="green">Seguro (Verde)</option>
+                  </select>
+                </div>
+              </div>
+            </div>
+
+            {/* Listado de Zonas */}
+            <div className="flex-1 flex flex-col min-h-[300px]">
+              <label className="text-[10px] text-slate-400 font-bold uppercase tracking-widest block mb-2.5">
+                Mapas Analizados ({radarData ? radarData.zones.length : 0})
+              </label>
+
+              {radarLoading && !radarData && (
+                <div className="flex-1 flex flex-col items-center justify-center p-6 text-center">
+                  <div className="w-8 h-8 rounded-full border-2 border-amber-500/20 border-t-albion-gold animate-spin mb-3"></div>
+                  <p className="text-xs text-slate-400 font-medium">Analizando actividad reciente...</p>
+                </div>
+              )}
+
+              {radarError && (
+                <div className="flex-1 flex flex-col items-center justify-center p-6 text-center">
+                  <div className="text-red-400 text-lg mb-2">✕</div>
+                  <p className="text-xs text-slate-400">{radarError}</p>
+                </div>
+              )}
+
+              {radarData && (
+                <div className="flex-1 bg-slate-950/50 border border-albion-border/30 rounded-md overflow-y-auto max-h-[420px] divide-y divide-albion-border/20">
+                  {radarData.zones
+                    .filter(z => {
+                      const matchSearch = z.name.toLowerCase().includes(radarSearchQuery.toLowerCase());
+                      const matchType = radarFilterType === "All" || z.type === radarFilterType;
+                      const matchRisk = radarFilterRisk === "All" || z.risk_level === radarFilterRisk;
+                      return matchSearch && matchType && matchRisk;
+                    })
+                    .map((zone) => {
+                      const riskColors = {
+                        green: { bg: "bg-emerald-500/10", border: "border-emerald-500/30", text: "text-emerald-400", label: "Seguro" },
+                        yellow: { bg: "bg-amber-500/10", border: "border-amber-500/30", text: "text-amber-400", label: "Precaución" },
+                        orange: { bg: "bg-orange-500/10", border: "border-orange-500/30", text: "text-orange-400", label: "Peligroso" },
+                        red: { bg: "bg-red-500/10", border: "border-red-500/30", text: "text-red-400", label: "Extremo" }
+                      };
+                      const colors = riskColors[zone.risk_level] || riskColors.green;
+                      const isSelected = selectedZone && selectedZone.name === zone.name;
+
+                      return (
+                        <button
+                          key={zone.name}
+                          onClick={() => setSelectedZone(zone)}
+                          className={`w-full text-left px-4 py-3 text-xs font-semibold transition-all flex items-center justify-between group cursor-pointer ${
+                            isSelected
+                              ? 'bg-amber-500/10 text-albion-gold border-l-2 border-albion-gold'
+                              : 'text-slate-300 hover:bg-slate-900/60 hover:text-slate-100'
+                          }`}
+                        >
+                          <div className="flex flex-col gap-0.5 min-w-0 pr-2">
+                            <span className="font-bold truncate">{zone.name}</span>
+                            <span className="text-[9px] text-slate-500 font-medium">
+                              {zone.type} • {zone.death_count} {zone.death_count === 1 ? 'muerte' : 'muertes'}
+                            </span>
+                          </div>
+                          <div className="flex items-center gap-3 shrink-0">
+                            <span className="text-[10px] font-mono text-slate-400">
+                              SV: {Math.round((zone.survival_gathering + zone.survival_farming + zone.survival_transport) / 3)}%
+                            </span>
+                            <span className={`px-2 py-0.5 rounded text-[9px] font-bold border ${colors.bg} ${colors.border} ${colors.text} uppercase tracking-wider`}>
+                              {colors.label}
+                            </span>
+                          </div>
+                        </button>
+                      );
+                    })}
+                </div>
+              )}
+            </div>
+          </section>
+
+          {/* RIGHT PANEL: Zone Details and Statistics */}
+          <section className="lg:col-span-7 p-6 flex flex-col overflow-y-auto bg-slate-950/10">
+            {!selectedZone ? (
+              <div className="flex-1 flex flex-col items-center justify-center p-8 text-center text-slate-500">
+                <div className="w-16 h-16 bg-slate-900 border border-albion-border/40 rounded-full flex items-center justify-center mb-4 text-2xl text-slate-600 shadow-inner">
+                  📡
+                </div>
+                <h3 className="text-sm font-bold font-display uppercase text-slate-400 tracking-wider">Radar PvP</h3>
+                <p className="text-xs text-slate-500 max-w-sm mt-1">Selecciona una zona del panel de la izquierda para ver el historial detallado de gankeo, perfiles de IP y tasas de supervivencia estimadas.</p>
+              </div>
+            ) : (
+              <div className="flex flex-col gap-6 animate-fadeIn">
+                {/* Cabecera del Detalle */}
+                <div className="border-b border-albion-border/60 pb-3.5 flex justify-between items-end">
+                  <div>
+                    <span className="text-[10px] font-bold text-amber-500 uppercase tracking-widest block">Análisis de Riesgo Local</span>
+                    <h2 className="text-xl font-bold text-slate-100 mt-0.5 font-display tracking-wide flex items-center gap-2.5">
+                      {selectedZone.name}
+                      <span className={`text-[10px] px-2 py-0.5 rounded font-sans font-bold border uppercase tracking-wider ${
+                        selectedZone.risk_level === 'red' ? 'bg-red-500/10 text-red-400 border-red-500/30' :
+                        selectedZone.risk_level === 'orange' ? 'bg-orange-500/10 text-orange-400 border-orange-500/30' :
+                        selectedZone.risk_level === 'yellow' ? 'bg-amber-500/10 text-amber-400 border-amber-500/30' :
+                        'bg-emerald-500/10 text-emerald-400 border-emerald-500/30'
+                      }`}>
+                        {selectedZone.risk_level === 'red' ? 'Extremo' :
+                         selectedZone.risk_level === 'orange' ? 'Peligroso' :
+                         selectedZone.risk_level === 'yellow' ? 'Precaución' : 'Seguro'}
+                      </span>
+                    </h2>
+                  </div>
+                  <span className="text-slate-500 text-[10px] font-semibold uppercase font-sans tracking-widest">{selectedZone.type}</span>
+                </div>
+
+                {/* Tarjetas de Métricas de Supervivencia */}
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  {/* Gathering Card */}
+                  <div className="bg-gradient-to-b from-slate-900 to-slate-950 border border-albion-border/60 rounded-lg p-4 shadow-md flex flex-col gap-2 relative overflow-hidden group">
+                    <span className="text-[9px] font-bold text-slate-400 uppercase tracking-widest block">Recolectar (Gathering)</span>
+                    <div className="flex items-baseline gap-2 mt-1">
+                      <span className={`text-2xl font-bold font-display ${
+                        selectedZone.survival_gathering >= 80 ? 'text-emerald-400' :
+                        selectedZone.survival_gathering >= 50 ? 'text-amber-400' : 'text-red-400'
+                      }`}>
+                        {selectedZone.survival_gathering}%
+                      </span>
+                      <span className="text-[10px] text-slate-500 font-medium">de supervivencia</span>
+                    </div>
+                    {/* Barra de Progreso */}
+                    <div className="w-full bg-slate-950 rounded-full h-1.5 border border-albion-border/30 overflow-hidden">
+                      <div 
+                        className={`h-full rounded-full transition-all duration-500 ${
+                          selectedZone.survival_gathering >= 80 ? 'bg-emerald-500' :
+                          selectedZone.survival_gathering >= 50 ? 'bg-amber-500' : 'bg-red-500'
+                        }`} 
+                        style={{ width: `${selectedZone.survival_gathering}%` }}
+                      ></div>
+                    </div>
+                  </div>
+
+                  {/* Farming Card */}
+                  <div className="bg-gradient-to-b from-slate-900 to-slate-950 border border-albion-border/60 rounded-lg p-4 shadow-md flex flex-col gap-2 relative overflow-hidden group">
+                    <span className="text-[9px] font-bold text-slate-400 uppercase tracking-widest block">Farming (Mobs/Dungeons)</span>
+                    <div className="flex items-baseline gap-2 mt-1">
+                      <span className={`text-2xl font-bold font-display ${
+                        selectedZone.survival_farming >= 80 ? 'text-emerald-400' :
+                        selectedZone.survival_farming >= 50 ? 'text-amber-400' : 'text-red-400'
+                      }`}>
+                        {selectedZone.survival_farming}%
+                      </span>
+                      <span className="text-[10px] text-slate-500 font-medium">de supervivencia</span>
+                    </div>
+                    {/* Barra de Progreso */}
+                    <div className="w-full bg-slate-950 rounded-full h-1.5 border border-albion-border/30 overflow-hidden">
+                      <div 
+                        className={`h-full rounded-full transition-all duration-500 ${
+                          selectedZone.survival_farming >= 80 ? 'bg-emerald-500' :
+                          selectedZone.survival_farming >= 50 ? 'bg-amber-500' : 'bg-red-500'
+                        }`} 
+                        style={{ width: `${selectedZone.survival_farming}%` }}
+                      ></div>
+                    </div>
+                  </div>
+
+                  {/* Transport Card */}
+                  <div className="bg-gradient-to-b from-slate-900 to-slate-950 border border-albion-border/60 rounded-lg p-4 shadow-md flex flex-col gap-2 relative overflow-hidden group">
+                    <span className="text-[9px] font-bold text-slate-400 uppercase tracking-widest block">Transportar Recursos</span>
+                    <div className="flex items-baseline gap-2 mt-1">
+                      <span className={`text-2xl font-bold font-display ${
+                        selectedZone.survival_transport >= 80 ? 'text-emerald-400' :
+                        selectedZone.survival_transport >= 50 ? 'text-amber-400' : 'text-red-400'
+                      }`}>
+                        {selectedZone.survival_transport}%
+                      </span>
+                      <span className="text-[10px] text-slate-500 font-medium">de supervivencia</span>
+                    </div>
+                    {/* Barra de Progreso */}
+                    <div className="w-full bg-slate-950 rounded-full h-1.5 border border-albion-border/30 overflow-hidden">
+                      <div 
+                        className={`h-full rounded-full transition-all duration-500 ${
+                          selectedZone.survival_transport >= 80 ? 'bg-emerald-500' :
+                          selectedZone.survival_transport >= 50 ? 'bg-amber-500' : 'bg-red-500'
+                        }`} 
+                        style={{ width: `${selectedZone.survival_transport}%` }}
+                      ></div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Métricas de Gankers */}
+                {selectedZone.death_count > 0 && (
+                  <div className="bg-slate-900/40 border border-albion-border/50 rounded-lg p-4 flex flex-col gap-3">
+                    <h3 className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Estadísticas de Amenazas Recientes</h3>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="bg-slate-950/40 border border-albion-border/30 px-4 py-3 rounded-md flex items-center justify-between">
+                        <span className="text-xs text-slate-400">Tamaño Grupo de Gankers:</span>
+                        <span className="text-sm font-bold font-mono text-amber-500">{selectedZone.avg_group_size} jugadores</span>
+                      </div>
+                      <div className="bg-slate-950/40 border border-albion-border/30 px-4 py-3 rounded-md flex items-center justify-between">
+                        <span className="text-xs text-slate-400">Poder de Item (IP) Promedio:</span>
+                        <span className="text-sm font-bold font-mono text-amber-500">{selectedZone.avg_killer_ip} IP</span>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* Feed de Muertes */}
+                <div className="flex flex-col gap-3">
+                  <h3 className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">
+                    Muertes Recientes en este mapa ({selectedZone.deaths.length})
+                  </h3>
+
+                  {selectedZone.deaths.length === 0 ? (
+                    <div className="bg-slate-900/30 border border-albion-border/20 rounded-md p-8 text-center text-slate-500">
+                      <div className="text-2xl mb-2">🌿</div>
+                      <p className="text-xs font-semibold text-slate-400">Sin muertes recientes</p>
+                      <p className="text-[10px] text-slate-500 mt-0.5">No se detectaron actividades hostiles recientes en este mapa en los últimos 50 eventos.</p>
+                    </div>
+                  ) : (
+                    <div className="flex flex-col gap-3">
+                      {selectedZone.deaths.map((death, i) => {
+                        const dateStr = death.timestamp ? new Date(death.timestamp).toLocaleTimeString() : "";
+                        return (
+                          <div key={i} className="bg-slate-900/60 border border-albion-border/40 hover:border-albion-border/80 rounded-lg p-4 flex flex-col gap-3.5 transition duration-150">
+                            {/* Línea Principal (Asesino y Víctima) */}
+                            <div className="flex justify-between items-start gap-4">
+                              <div className="min-w-0 flex-1">
+                                <div className="flex items-center gap-1.5 flex-wrap">
+                                  <span className="text-xs font-bold text-red-400">{death.killer_name}</span>
+                                  {death.killer_guild && (
+                                    <span className="text-[10px] text-slate-400">[{death.killer_guild}]</span>
+                                  )}
+                                  <span className="text-[10px] text-slate-500 uppercase tracking-wide">asesinó a</span>
+                                  <span className="text-xs font-bold text-slate-200">{death.victim_name}</span>
+                                  {death.victim_guild && (
+                                    <span className="text-[10px] text-slate-400">[{death.victim_guild}]</span>
+                                  )}
+                                </div>
+                                <div className="flex items-center gap-2 mt-1 text-[10px] text-slate-500 font-medium">
+                                  <span>Gankers: {death.group_size}</span>
+                                  <span>•</span>
+                                  <span>Fama Perdida: <span className="font-mono text-amber-500/80">{formatSilver(death.fame)}</span></span>
+                                  <span>•</span>
+                                  <span>Hora: {dateStr}</span>
+                                </div>
+                              </div>
+
+                              <div className="flex flex-col items-end shrink-0 gap-1">
+                                <span className="text-[10px] font-bold text-slate-400">Víctima: {death.victim_ip} IP</span>
+                                <span className="text-[10px] font-bold text-red-500/80">Asesino: {death.killer_ip} IP</span>
+                              </div>
+                            </div>
+
+                            {/* Detalle de Ítems Perdidos de la Víctima */}
+                            {(death.equipment.length > 0 || death.inventory.length > 0) && (
+                              <div className="border-t border-albion-border/20 pt-2.5">
+                                <span className="text-[9px] font-bold text-slate-500 uppercase tracking-widest block mb-2">Equipamiento & Inventario perdido</span>
+                                <div className="flex flex-wrap gap-1.5 max-h-[80px] overflow-y-auto pr-1">
+                                  {/* Mostrar Equipamiento */}
+                                  {death.equipment.map((item, idx) => (
+                                    <span key={`eq-${idx}`} className="text-[9px] font-semibold bg-slate-950/80 border border-albion-gold/20 text-slate-300 px-2 py-1 rounded" title={item.id}>
+                                      🛡️ {item.name} {item.count > 1 ? `x${item.count}` : ""}
+                                    </span>
+                                  ))}
+                                  {/* Mostrar Inventario */}
+                                  {death.inventory.map((item, idx) => (
+                                    <span key={`inv-${idx}`} className="text-[9px] font-medium bg-slate-950/40 border border-slate-800 text-slate-400 px-2 py-1 rounded" title={item.id}>
+                                      📦 {item.name} {item.count > 1 ? `x${item.count}` : ""}
+                                    </span>
+                                  ))}
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+
+                <div className="bg-slate-900/30 border border-albion-border/20 rounded p-3 text-[10px] text-slate-500 flex gap-2 items-center mt-2">
+                  <span>ℹ</span>
+                  <span>El porcentaje de supervivencia es una estimación en base al volumen de muertes, la cantidad promedio de gankers y su Item Power (IP) actual. Si viajas en grupo o usas builds específicas de escape, tus posibilidades de supervivencia aumentarán significativamente.</span>
+                </div>
               </div>
             )}
           </section>

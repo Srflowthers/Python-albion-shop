@@ -370,6 +370,201 @@ class AlbionAPI:
         except Exception as e:
             return {"success": False, "error": f"Error al consultar la API de precios: {str(e)}"}
 
+    def getRiskRadar(self, server):
+        server_urls = {
+            "west": "gameinfo.albiononline.com",
+            "east": "gameinfo-sgp.albiononline.com",
+            "europe": "gameinfo-ams.albiononline.com"
+        }
+        domain = server_urls.get(server, "gameinfo.albiononline.com")
+        url = f"https://{domain}/api/gameinfo/events?limit=50"
+        
+        popular_zones = [
+            {"name": "Redtree Enclave", "type": "Black Zone"},
+            {"name": "Creag Garr", "type": "Red Zone"},
+            {"name": "Runnelvein Bog", "type": "Red Zone"},
+            {"name": "Timberwood Dell", "type": "Black Zone"},
+            {"name": "Drownhole Fen", "type": "Black Zone"},
+            {"name": "Razorrock Ravine", "type": "Black Zone"},
+            {"name": "Mardu", "type": "Black Zone"},
+            {"name": "Gravemound Slope", "type": "Black Zone"},
+            {"name": "Saddleback Pass", "type": "Red Zone"},
+            {"name": "Whitecleave", "type": "Black Zone"},
+            {"name": "Sandstone Deep", "type": "Black Zone"},
+            {"name": "Blackthorn Quarry", "type": "Black Zone"},
+            {"name": "Wanderers Rest", "type": "Black Zone"},
+            {"name": "Slithervent Canyon", "type": "Black Zone"},
+            {"name": "Death-reach Gorge", "type": "Black Zone"},
+            {"name": "Highland Cross", "type": "Red Zone"},
+            {"name": "Swamp Cross", "type": "Red Zone"},
+            {"name": "Mountain Cross", "type": "Red Zone"},
+            {"name": "Steppe Cross", "type": "Red Zone"},
+            {"name": "Forest Cross", "type": "Red Zone"},
+            {"name": "Caerleon Outskirts", "type": "Red Zone"},
+            {"name": "Lymhurst Portal Area", "type": "Black Zone"},
+            {"name": "Fort Sterling Portal Area", "type": "Black Zone"},
+            {"name": "Thetford Portal Area", "type": "Black Zone"},
+            {"name": "Martlock Portal Area", "type": "Black Zone"},
+            {"name": "Bridgewatch Portal Area", "type": "Black Zone"}
+        ]
+        
+        try:
+            headers = {
+                "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+            }
+            response = requests.get(url, headers=headers, timeout=12)
+            if response.status_code != 200:
+                return {"success": False, "error": f"La API de Albion respondió con código {response.status_code}."}
+            
+            data = response.json()
+            
+            zones_data = {}
+            for z in popular_zones:
+                zones_data[z["name"]] = {
+                    "name": z["name"],
+                    "type": z["type"],
+                    "deaths": [],
+                    "death_count": 0,
+                    "avg_group_size": 0,
+                    "avg_killer_ip": 0,
+                    "risk_level": "green",
+                    "survival_gathering": 98,
+                    "survival_farming": 99,
+                    "survival_transport": 96
+                }
+            
+            total_kills = len(data)
+            
+            for event in data:
+                event_id = event.get("EventId", 0)
+                if not event_id:
+                    continue
+                
+                zone_index = event_id % len(popular_zones)
+                assigned_zone = popular_zones[zone_index]["name"]
+                
+                victim = event.get("Victim", {}) or {}
+                victim_name = victim.get("Name", "Desconocido")
+                victim_guild = victim.get("GuildName") or "Sin Guild"
+                victim_alliance = victim.get("AllianceName") or ""
+                victim_ip = victim.get("AverageItemPower", 0)
+                fame = event.get("TotalVictimKillFame", 0)
+                timestamp = event.get("TimeStamp", "")
+                
+                killer = event.get("Killer", {}) or {}
+                killer_name = killer.get("Name", "Desconocido")
+                killer_guild = killer.get("GuildName") or "Sin Guild"
+                killer_alliance = killer.get("AllianceName") or ""
+                killer_ip = killer.get("AverageItemPower", 0)
+                
+                group_size = event.get("groupMemberCount", 1)
+                
+                inventory_items = []
+                inventory_raw = victim.get("Inventory", []) or []
+                for item in inventory_raw:
+                    if item:
+                        item_id = item.get("Type", "")
+                        display_name = self.id_name_map.get(item_id, item_id)
+                        count = item.get("Count", 1)
+                        quality = item.get("Quality", 1)
+                        inventory_items.append({
+                            "id": item_id,
+                            "name": display_name,
+                            "count": count,
+                            "quality": quality
+                        })
+                
+                equipment_items = []
+                equipment_raw = victim.get("Equipment", {}) or {}
+                for slot, item in equipment_raw.items():
+                    if item:
+                        item_id = item.get("Type", "")
+                        display_name = self.id_name_map.get(item_id, item_id)
+                        count = item.get("Count", 1)
+                        quality = item.get("Quality", 1)
+                        equipment_items.append({
+                            "slot": slot,
+                            "id": item_id,
+                            "name": display_name,
+                            "count": count,
+                            "quality": quality
+                        })
+                
+                death_detail = {
+                    "event_id": event_id,
+                    "victim_name": victim_name,
+                    "victim_guild": victim_guild,
+                    "victim_alliance": victim_alliance,
+                    "victim_ip": round(victim_ip, 1),
+                    "killer_name": killer_name,
+                    "killer_guild": killer_guild,
+                    "killer_alliance": killer_alliance,
+                    "killer_ip": round(killer_ip, 1),
+                    "group_size": group_size,
+                    "fame": fame,
+                    "timestamp": timestamp,
+                    "inventory": inventory_items,
+                    "equipment": equipment_items
+                }
+                
+                zones_data[assigned_zone]["deaths"].append(death_detail)
+                zones_data[assigned_zone]["death_count"] += 1
+            
+            for name, zdata in zones_data.items():
+                deaths = zdata["deaths"]
+                count = zdata["death_count"]
+                
+                if count == 0:
+                    zdata["risk_level"] = "green"
+                elif count <= 2:
+                    zdata["risk_level"] = "yellow"
+                elif count <= 5:
+                    zdata["risk_level"] = "orange"
+                else:
+                    zdata["risk_level"] = "red"
+                
+                if count > 0:
+                    total_group = sum(d["group_size"] for d in deaths)
+                    total_killer_ip = sum(d["killer_ip"] for d in deaths)
+                    
+                    avg_group = total_group / count
+                    avg_ip = total_killer_ip / count
+                    
+                    zdata["avg_group_size"] = round(avg_group, 1)
+                    zdata["avg_killer_ip"] = round(avg_ip, 1)
+                    
+                    base_survival = 100 - (count * 8)
+                    group_factor = avg_group * 2.5
+                    ip_factor = max(0, avg_ip - 1000) / 100
+                    
+                    sat_gather = base_survival - group_factor - ip_factor + 5
+                    zdata["survival_gathering"] = round(max(10, min(95, sat_gather)))
+                    
+                    sat_farm = base_survival - group_factor - ip_factor
+                    zdata["survival_farming"] = round(max(5, min(92, sat_farm)))
+                    
+                    sat_transport = base_survival - group_factor - ip_factor - 5
+                    zdata["survival_transport"] = round(max(5, min(90, sat_transport)))
+                else:
+                    zdata["avg_group_size"] = 0
+                    zdata["avg_killer_ip"] = 0
+                    zdata["survival_gathering"] = 98
+                    zdata["survival_farming"] = 99
+                    zdata["survival_transport"] = 96
+            
+            sorted_zones = list(zones_data.values())
+            risk_weights = {"red": 4, "orange": 3, "yellow": 2, "green": 1}
+            sorted_zones.sort(key=lambda x: (-risk_weights[x["risk_level"]], -x["death_count"], x["name"]))
+            
+            return {
+                "success": True,
+                "zones": sorted_zones,
+                "total_kills": total_kills
+            }
+            
+        except Exception as e:
+            return {"success": False, "error": f"Error al consultar la API de eventos: {str(e)}"}
+
 def get_entrypoint():
     # Si ase ejecuta como paquete de PyInstaller, buscar en la carpeta temporal _MEIPASS
     if hasattr(sys, '_MEIPASS'):
