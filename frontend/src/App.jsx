@@ -1,6 +1,14 @@
 import React, { useState, useEffect, useRef } from 'react';
 import './App.css';
 
+const QUALITY_NAMES = {
+  1: "Normal",
+  2: "Bueno",
+  3: "Sobresaliente",
+  4: "Excelente",
+  5: "Obra Maestra"
+};
+
 // Mock or Native Pywebview API
 const getApi = () => {
   if (window.pywebview && window.pywebview.api) {
@@ -60,7 +68,7 @@ const getApi = () => {
         item.toLowerCase().includes(query.toLowerCase())
       ).slice(0, 10);
     },
-    getPrices: async (selectedName, tierChoice, encChoice, server) => {
+    getPrices: async (selectedName, tierChoice, encChoice, qualityChoice, server) => {
       await new Promise(resolve => setTimeout(resolve, 1000));
       // Generar precios mock aleatorios para simular
       const cities = ["Caerleon", "Lymhurst", "Martlock", "Bridgewatch", "Fort Sterling", "Thetford", "Brecilien"];
@@ -70,11 +78,16 @@ const getApi = () => {
         const factor = 0.8 + Math.random() * 0.4;
         const sell = Math.floor(basePrice * factor);
         const buy = Math.floor(sell * (0.5 + Math.random() * 0.3));
+        const item_id = `T${tierChoice || 4}_BOW_BADON` + (encChoice && encChoice !== "0" ? `@${encChoice}` : "");
         return {
           city,
           sell_price_min: sell,
           buy_price_max: Math.random() > 0.3 ? buy : 0,
-          item_id: `T${tierChoice || 4}_BOW_BADON` + (encChoice && encChoice !== "0" ? `@${encChoice}` : "")
+          item_id,
+          quality: qualityChoice ? parseInt(qualityChoice) : 1,
+          name: selectedName,
+          tier: tierChoice || "4",
+          enchantment: encChoice || "0"
         };
       });
 
@@ -94,7 +107,8 @@ const getApi = () => {
           buy_price: buy_opt.sell_price_min,
           sell_city: sell_opt ? sell_opt.city : "N/A",
           sell_price: sell_opt ? sell_opt.buy_price_max : 0,
-          tier_label: `T${tierChoice || 4}` + (encChoice ? `.${encChoice}` : ".0")
+          tier_label: `T${tierChoice || 4}` + (encChoice ? `.${encChoice}` : ".0"),
+          quality: qualityChoice ? parseInt(qualityChoice) : 1
         }
       };
     }
@@ -114,6 +128,7 @@ function App() {
   const [selectedItem, setSelectedItem] = useState(null);
   const [tier, setTier] = useState("");
   const [enchantment, setEnchantment] = useState("");
+  const [quality, setQuality] = useState("");
   const [server, setServer] = useState("west");
   
   const [pricesLoading, setPricesLoading] = useState(false);
@@ -197,6 +212,7 @@ function App() {
     setSelectedItem(itemName);
     setTier("");
     setEnchantment("");
+    setQuality("");
     setPricesData(null);
   };
 
@@ -205,7 +221,7 @@ function App() {
     setPricesLoading(true);
     setPricesError(null);
     try {
-      const res = await api.current.getPrices(selectedItem, tier, enchantment, server);
+      const res = await api.current.getPrices(selectedItem, tier, enchantment, quality, server);
       if (res.success) {
         setPricesData(res);
       } else {
@@ -448,6 +464,22 @@ function App() {
                   </div>
                 </div>
 
+                <div>
+                  <label className="text-[10px] text-slate-400 font-bold uppercase tracking-widest block mb-1.5">6. Calidad</label>
+                  <select
+                    value={quality}
+                    onChange={(e) => setQuality(e.target.value)}
+                    className="w-full bg-slate-900 border border-albion-border/60 text-xs text-slate-200 px-3 py-2 rounded-md outline-none focus:border-albion-gold font-semibold"
+                  >
+                    <option value="">TODOS</option>
+                    <option value="1">Normal</option>
+                    <option value="2">Bueno (Good)</option>
+                    <option value="3">Sobresaliente (Outstanding)</option>
+                    <option value="4">Excelente (Excellent)</option>
+                    <option value="5">Obra Maestra (Masterpiece)</option>
+                  </select>
+                </div>
+
                 <button
                   onClick={fetchPrices}
                   disabled={pricesLoading}
@@ -508,8 +540,14 @@ function App() {
                     <span className="text-[10px] font-bold text-amber-500 uppercase tracking-widest block">Análisis de Mercado</span>
                     <h2 className="text-lg font-bold text-slate-100 mt-0.5 font-display tracking-wide">{selectedItem}</h2>
                   </div>
-                  <span className="bg-amber-500/10 text-albion-gold border border-albion-gold/30 text-[10px] font-bold px-2 py-0.5 rounded font-mono">
-                    {pricesData.recommendation?.tier_label || "Filtro"}
+                  <span className="bg-amber-500/10 text-albion-gold border border-albion-gold/30 text-[10px] font-bold px-2 py-0.5 rounded font-mono flex items-center gap-1.5">
+                    <span>{pricesData.recommendation?.tier_label || "Filtro"}</span>
+                    {pricesData.recommendation?.quality && (
+                      <>
+                        <span className="text-slate-600">|</span>
+                        <span>{QUALITY_NAMES[pricesData.recommendation.quality]}</span>
+                      </>
+                    )}
                   </span>
                 </div>
 
@@ -569,9 +607,13 @@ function App() {
                       <table className="w-full text-left border-collapse">
                         <thead>
                           <tr className="bg-slate-950 border-b border-albion-border/50 text-[10px] text-slate-400 uppercase font-bold tracking-wider">
+                            <th className="py-3 px-4">Ítem</th>
                             <th className="py-3 px-4">Ciudad</th>
-                            <th className="py-3 px-4 text-right">Precio Venta Mín (Comprar)</th>
-                            <th className="py-3 px-4 text-right">Precio Compra Máx (Vender)</th>
+                            <th className="py-3 px-4">Calidad</th>
+                            <th className="py-3 px-4 text-center">Tier</th>
+                            <th className="py-3 px-4 text-center">Encant.</th>
+                            <th className="py-3 px-4 text-right">Precio Venta (Comprar)</th>
+                            <th className="py-3 px-4 text-right">Precio Compra (Vender)</th>
                           </tr>
                         </thead>
                         <tbody className="divide-y divide-albion-border/20 text-xs font-medium">
@@ -586,6 +628,9 @@ function App() {
                                   isCheapestBuy ? 'bg-amber-950/20' : isBestSell ? 'bg-emerald-950/20' : ''
                                 }`}
                               >
+                                <td className="py-3.5 px-4 font-bold text-slate-100 truncate max-w-[180px]" title={p.name}>
+                                  {p.name || selectedItem}
+                                </td>
                                 <td className="py-3.5 px-4 font-bold flex items-center gap-2">
                                   <span className="text-slate-100">{p.city}</span>
                                   {isCheapestBuy && (
@@ -594,6 +639,15 @@ function App() {
                                   {isBestSell && (
                                     <span className="bg-emerald-500/20 text-[9px] text-emerald-400 font-bold px-1.5 py-0.5 rounded border border-emerald-500/30 uppercase scale-90">Mejor Venta</span>
                                   )}
+                                </td>
+                                <td className="py-3.5 px-4 text-slate-300">
+                                  {QUALITY_NAMES[p.quality] || "Normal"}
+                                </td>
+                                <td className="py-3.5 px-4 text-slate-300 text-center font-semibold">
+                                  T{p.tier || "4"}
+                                </td>
+                                <td className="py-3.5 px-4 text-slate-300 text-center font-mono">
+                                  .{p.enchantment || "0"}
                                 </td>
                                 <td className={`py-3.5 px-4 text-right font-mono text-slate-300 ${isCheapestBuy ? 'text-amber-400 font-bold' : ''}`}>
                                   {p.sell_price_min > 0 ? `${formatSilver(p.sell_price_min)}` : 'N/D'}

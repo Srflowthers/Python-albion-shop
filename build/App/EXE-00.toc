@@ -68,7 +68,7 @@
  [],
  False,
  False,
- 1779735840,
+ 1779767785,
  [('runw.exe',
    'c:\\Users\\lisan\\Desktop\\Python-albion\\.venv\\Lib\\site-packages\\PyInstaller\\bootloader\\Windows-64bit-intel\\runw.exe',
    'EXECUTABLE')],
