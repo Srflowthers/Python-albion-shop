@@ -112,17 +112,70 @@ def clean_base_name(name):
 
 class AlbionAPI:
     def __init__(self):
+        self.window = None
         self.items = []
         self.item_map = {}
         self.item_names = []
         self.id_name_map = {}
+        self.image_cache = {}
         self.categorias = {
             "1": ("Armas", ["Espada", "Hacha", "Maza", "Martillo", "Arco", "Ballesta", "Bastón", "Daga", "Guanteletes", "Brazalete", "Lanza", "Vara"]),
             "2": ("Armaduras / Pechos", ["Armadura", "Chaqueta", "Toga"]),
             "3": ("Cascos / Cabezas", ["Casco", "Capucha", "Hábito"]),
             "4": ("Botas / Pies", ["Zapatos", "Botas", "Sandalias"]),
-            "5": ("Accesorios", ["Capa", "Bolsa"])
+            "5": ("Accesorios", ["Capa", "Bolsa"]),
+            "8": ("Artefactos", ["Runa", "Alma", "Reliquia"])
         }
+
+    def set_window(self, window):
+        self.window = window
+
+    def getItemImageBase64(self, item_id):
+        if item_id in self.image_cache:
+            return {"success": True, "base64": self.image_cache[item_id]}
+        import base64
+        import requests
+        try:
+            url = f"https://render.albiononline.com/v1/item/{item_id}.png"
+            response = requests.get(url, timeout=10)
+            if response.status_code == 200:
+                encoded = base64.b64encode(response.content).decode('utf-8')
+                base64_str = f"data:image/png;base64,{encoded}"
+                self.image_cache[item_id] = base64_str
+                return {"success": True, "base64": base64_str}
+            else:
+                return {"success": False, "error": f"HTTP status {response.status_code}"}
+        except Exception as e:
+            return {"success": False, "error": str(e)}
+
+    def saveScreenshot(self, base64_image, filename):
+        import base64
+        import webview
+        try:
+            if "," in base64_image:
+                base64_image = base64_image.split(",", 1)[1]
+            image_data = base64.b64decode(base64_image)
+            
+            win = self.window or (webview.windows[0] if webview.windows else None)
+            if win:
+                save_path = win.create_file_dialog(
+                    webview.SAVE_DIALOG,
+                    directory="",
+                    save_filename=filename,
+                    file_types=("Imágenes PNG (*.png)", "Todos los archivos (*.*)")
+                )
+                if save_path:
+                    if isinstance(save_path, list) or isinstance(save_path, tuple):
+                        save_path = save_path[0]
+                    if save_path and not save_path.lower().endswith(".png"):
+                        save_path += ".png"
+                    
+                    with open(save_path, "wb") as f:
+                        f.write(image_data)
+                    return {"success": True, "saved_path": save_path}
+            return {"success": False, "error": "Cancelado."}
+        except Exception as e:
+            return {"success": False, "error": str(e)}
 
     def loadDatabase(self):
         try:
@@ -171,6 +224,9 @@ class AlbionAPI:
             return "73"  # Tomos
         if any(kw in uname for kw in ["_MAP", "_HELLGATE", "_BAIT", "_CREST", "QUESTITEM_EXP_TOKEN"]):
             return "74"  # Otros Consumibles
+            
+        if uname.endswith("_RUNE") or uname.endswith("_SOUL") or uname.endswith("_RELIC"):
+            return "8"  # Artefactos (Runas, Almas, Reliquias)
             
         # Exclude artifacts and tools from equipment categories
         if "_ARTEFACT_" in uname or "_TOOL_" in uname:
@@ -386,38 +442,60 @@ class AlbionAPI:
                     "enchantment": enc_val
                 })
                 
-            # Recomendaciones
-            mejor_compra = min(prices, key=lambda x: x["sell_price_min"])
+            # Recomendaciones (Excluyendo "Black Market" de las opciones de compra)
+            buy_options = [x for x in prices if x["city"].strip().lower() != "black market"]
             opciones_venta = [x for x in prices if x.get("buy_price_max", 0) > 0]
             
-            best_id = mejor_compra["item_id"]
-            best_enc = "0"
-            if "@" in best_id:
-                parts_best = best_id.split("@")
-                best_enc = parts_best[1] if len(parts_best) > 1 else "0"
-            else:
-                for lvl in ["1", "2", "3", "4"]:
-                    if f"_LEVEL{lvl}" in best_id:
-                        best_enc = lvl
-                        break
-            
-            tier_val = best_id.split("_")[0]
-            tier_best = f'{tier_val.split("_")[0][1:]}.{best_enc}'
-            
             recommendation = {
-                "buy_city": mejor_compra["city"],
-                "buy_price": mejor_compra["sell_price_min"],
+                "buy_city": "N/A",
+                "buy_price": 0,
                 "sell_city": "N/A",
                 "sell_price": 0,
-                "tier_label": f"T{tier_best}",
-                "quality": mejor_compra.get("quality", 1)
+                "tier_label": "N/A",
+                "quality": 1
             }
             
+            if buy_options:
+                mejor_compra = min(buy_options, key=lambda x: x["sell_price_min"])
+                best_id = mejor_compra["item_id"]
+                best_enc = "0"
+                if "@" in best_id:
+                    parts_best = best_id.split("@")
+                    best_enc = parts_best[1] if len(parts_best) > 1 else "0"
+                else:
+                    for lvl in ["1", "2", "3", "4"]:
+                        if f"_LEVEL{lvl}" in best_id:
+                            best_enc = lvl
+                            break
+                
+                tier_val = best_id.split("_")[0]
+                tier_best = f'{tier_val.split("_")[0][1:]}.{best_enc}'
+                
+                recommendation["buy_city"] = mejor_compra["city"]
+                recommendation["buy_price"] = mejor_compra["sell_price_min"]
+                recommendation["tier_label"] = f"T{tier_best}"
+                recommendation["quality"] = mejor_compra.get("quality", 1)
+                
             if opciones_venta:
                 mejor_venta = max(opciones_venta, key=lambda x: x["buy_price_max"])
                 recommendation["sell_city"] = mejor_venta["city"]
                 recommendation["sell_price"] = mejor_venta["buy_price_max"]
-                
+                if recommendation["tier_label"] == "N/A":
+                    best_id = mejor_venta["item_id"]
+                    best_enc = "0"
+                    if "@" in best_id:
+                        parts_best = best_id.split("@")
+                        best_enc = parts_best[1] if len(parts_best) > 1 else "0"
+                    else:
+                        for lvl in ["1", "2", "3", "4"]:
+                            if f"_LEVEL{lvl}" in best_id:
+                                best_enc = lvl
+                                break
+                    tier_val = best_id.split("_")[0]
+                    tier_best = f'{tier_val.split("_")[0][1:]}.{best_enc}'
+                    recommendation["tier_label"] = f"T{tier_best}"
+                    recommendation["quality"] = mejor_venta.get("quality", 1)
+                    
             return {
                 "success": True,
                 "prices": formatted_prices,
@@ -683,6 +761,8 @@ if __name__ == '__main__':
         height=720,
         min_size=(900, 600)
     )
+    
+    api.set_window(window)
     
     # En desarrollo activamos modo debug (Click derecho -> Inspeccionar elemento disponible)
     webview.start(debug=True if entry.startswith('http') else False)

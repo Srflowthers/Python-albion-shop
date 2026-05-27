@@ -43,4 +43,17 @@ print("Food Tiers found:")
 for t in food_tiers:
     print(f"  - Tier {t['tier']} ({t['id']}): {t['name']}")
 
+# Test Artifacts Category and Tiers lookup
+print("\nTesting Artifacts Category (Category 8)...")
+results = api.searchItems("8", "Runa")
+print("Artifact search results for 'Runa':")
+for r in results:
+    print(f"  - '{r['display_name']}' ({r['id']})")
+
+print("\nTesting Artifact Tiers lookup for 'Runa'...")
+runa_tiers = api.getItemTiers("Runa")
+print("Runa Tiers found:")
+for t in runa_tiers:
+    print(f"  - Tier {t['tier']} ({t['id']}): {t['name']}")
+
 print("\nVerification completed successfully!")

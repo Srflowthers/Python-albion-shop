@@ -107,6 +107,17 @@ const getApi = () => {
         "5": [
           "Capa del iniciado",
           "Bolsa del iniciado"
+        ],
+        "8": [
+          "Runa del iniciado",
+          "Runa del experto",
+          "Runa del maestro",
+          "Alma del iniciado",
+          "Alma del experto",
+          "Alma del maestro",
+          "Reliquia del iniciado",
+          "Reliquia del experto",
+          "Reliquia del maestro"
         ]
       };
       const items = mockDb[categoryId] || [];
@@ -115,18 +126,26 @@ const getApi = () => {
         "2": "T4_ARMOR_PLATE_SET1",
         "3": "T4_HEAD_PLATE_SET1",
         "4": "T4_SHOES_PLATE_SET1",
-        "5": "T4_CAPE"
+        "5": "T4_CAPE",
+        "8": "T4_RUNE"
       };
-      const itemId = idMap[categoryId] || "T4_CAPE";
       
       const filtered = query.trim()
         ? items.filter(item => item.toLowerCase().includes(query.toLowerCase()))
         : items;
         
-      return filtered.slice(0, 10).map(item => ({
-        display_name: item,
-        id: itemId
-      }));
+      return filtered.slice(0, 10).map(item => {
+        let itemId = idMap[categoryId] || "T4_CAPE";
+        if (categoryId === "8") {
+          if (item.includes("Runa")) itemId = "T4_RUNE";
+          else if (item.includes("Alma")) itemId = "T4_SOUL";
+          else if (item.includes("Reliquia")) itemId = "T4_RELIC";
+        }
+        return {
+          display_name: item.includes(" del ") ? item.split(" del ")[0] : item,
+          id: itemId
+        };
+      });
     },
     getPrices: async (selectedName, tierChoice, encChoice, qualityChoice, server) => {
       await new Promise(resolve => setTimeout(resolve, 1000));
@@ -199,6 +218,14 @@ const getApi = () => {
           id: `T${t}_${itemName}`,
           name: names[t - 1] || `${itemName} T${t}`
         })).filter(x => x.name !== "");
+      }
+      if (["Runa", "Alma", "Reliquia"].includes(itemName)) {
+        const idSuffix = itemName === "Runa" ? "RUNE" : itemName === "Alma" ? "SOUL" : "RELIC";
+        return [
+          { tier: "4", id: `T4_${idSuffix}`, name: `${itemName} del iniciado` },
+          { tier: "5", id: `T5_${idSuffix}`, name: `${itemName} del experto` },
+          { tier: "6", id: `T6_${idSuffix}`, name: `${itemName} del maestro` }
+        ];
       }
       return [
         { tier: "4", id: "T4_CAPE", name: "Capa de iniciado" },
@@ -354,7 +381,58 @@ function App() {
   const [lastRadarUpdate, setLastRadarUpdate] = useState(null);
   const [refreshCountdown, setRefreshCountdown] = useState(45);
 
+  const [deathItemImages, setDeathItemImages] = useState({});
+  const [loadingDeathImages, setLoadingDeathImages] = useState(false);
+
   const api = useRef(null);
+
+  // Cargar imágenes en base64 para evitar taint en el canvas (CORS) en el modal de muertes
+  useEffect(() => {
+    if (!selectedDeath) {
+      setDeathItemImages({});
+      setLoadingDeathImages(false);
+      return;
+    }
+
+    const loadImages = async () => {
+      setLoadingDeathImages(true);
+      const uniqueIds = new Set();
+      
+      if (selectedDeath.equipment) {
+        selectedDeath.equipment.forEach(item => {
+          if (item && item.id) uniqueIds.add(item.id);
+        });
+      }
+      if (selectedDeath.inventory) {
+        selectedDeath.inventory.forEach(item => {
+          if (item && item.id) uniqueIds.add(item.id);
+        });
+      }
+
+      const imagesMap = {};
+      const promises = Array.from(uniqueIds).map(async (itemId) => {
+        try {
+          if (api.current && !api.current.isMock && api.current.getItemImageBase64) {
+            const res = await api.current.getItemImageBase64(itemId);
+            if (res && res.success && res.base64) {
+              imagesMap[itemId] = res.base64;
+              return;
+            }
+          }
+        } catch (err) {
+          console.error("Error loading base64 image for item:", itemId, err);
+        }
+        // Fallback
+        imagesMap[itemId] = `https://render.albiononline.com/v1/item/${itemId}.png`;
+      });
+
+      await Promise.all(promises);
+      setDeathItemImages(imagesMap);
+      setLoadingDeathImages(false);
+    };
+
+    loadImages();
+  }, [selectedDeath]);
 
   // Inicializar API y descargar Base de Datos
   useEffect(() => {
@@ -466,6 +544,8 @@ function App() {
       setSelectedCategory("71");
     } else if (tab === "materiales") {
       setSelectedCategory("6");
+    } else if (tab === "artefactos") {
+      setSelectedCategory("8");
     }
   };
 
@@ -696,7 +776,7 @@ function App() {
             {/* Main Category Tabs */}
             <div>
               <label className="text-[10px] text-slate-400 font-bold uppercase tracking-widest block mb-2.5">1. Categoría Principal</label>
-              <div className="grid grid-cols-3 gap-2 bg-slate-950/80 border border-albion-border/60 p-1.5 rounded-lg shadow-inner">
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-2 bg-slate-950/80 border border-albion-border/60 p-1.5 rounded-lg shadow-inner">
                 <button
                   onClick={() => handleSelectMainTab("equipamiento")}
                   className={`py-2 px-2 rounded-md text-xs font-bold uppercase tracking-wider transition-all duration-200 cursor-pointer text-center flex flex-col items-center gap-1.5 ${
@@ -729,6 +809,17 @@ function App() {
                 >
                   <span className="text-base">🪵</span>
                   <span className="text-[9px] sm:text-[10px]">Materiales</span>
+                </button>
+                <button
+                  onClick={() => handleSelectMainTab("artefactos")}
+                  className={`py-2 px-2 rounded-md text-xs font-bold uppercase tracking-wider transition-all duration-200 cursor-pointer text-center flex flex-col items-center gap-1.5 ${
+                    selectedMainTab === "artefactos"
+                      ? "bg-amber-500/10 text-albion-gold border border-albion-gold/40 shadow-[0_0_10px_rgba(198,161,82,0.15)]"
+                      : "text-slate-400 hover:text-slate-200 border border-transparent hover:bg-slate-900/40"
+                  }`}
+                >
+                  <span className="text-base">🔮</span>
+                  <span className="text-[9px] sm:text-[10px]">Artefactos</span>
                 </button>
               </div>
             </div>
@@ -891,11 +982,13 @@ function App() {
             {/* Search Input Box (only shown for Equipamiento and Consumibles except Comida) */}
             {selectedMainTab !== "materiales" && selectedCategory !== "71" && (
               <div className="flex flex-col gap-1.5">
-                <label className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">2. Buscar Nombre del Ítem</label>
+                <label className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">
+                  {selectedMainTab === "artefactos" ? "2. Buscar Nombre del Artefacto" : "2. Buscar Nombre del Ítem"}
+                </label>
                 <div className="relative">
                   <input
                     type="text"
-                    placeholder="Ej: Badon, Talla, Guante..."
+                    placeholder={selectedMainTab === "artefactos" ? "Ej: Runa, Alma, Reliquia..." : "Ej: Badon, Talla, Guante..."}
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
                     className="w-full bg-slate-950/80 border border-albion-border/80 focus:border-albion-gold text-sm text-slate-200 pl-4.5 pr-10 py-3 rounded-md outline-none transition-all placeholder-slate-600 font-medium"
@@ -967,6 +1060,7 @@ function App() {
                     </select>
                   </div>
 
+                {selectedCategory !== "8" && !selectedCategory.startsWith("7") && (
                   <div>
                     <label className="text-[10px] text-slate-400 font-bold uppercase tracking-widest block mb-1.5">Encantamiento</label>
                     <select
@@ -975,16 +1069,17 @@ function App() {
                       className="w-full bg-slate-900 border border-albion-border/60 text-xs text-slate-200 px-3 py-2 rounded-md outline-none focus:border-albion-gold font-semibold"
                     >
                       <option value="">TODOS</option>
-                      <option value="0">Normal (.0)</option>
-                      <option value="1">Encantado 1 (.1)</option>
-                      <option value="2">Encantado 2 (.2)</option>
-                      <option value="3">Encantado 3 (.3)</option>
-                      <option value="4">Encantado 4 (.4)</option>
+                      <option value="0">Normal</option>
+                      <option value="1">Encantamiento 1</option>
+                      <option value="2">Encantamiento 2</option>
+                      <option value="3">Encantamiento 3</option>
+                      <option value="4">Encantamiento 4</option>
                     </select>
                   </div>
+                )}
                 </div>
 
-                {selectedCategory !== "6" && !selectedCategory.startsWith("7") && (
+                {selectedCategory !== "6" && selectedCategory !== "8" && !selectedCategory.startsWith("7") && (
                   <div>
                     <label className="text-[10px] text-slate-400 font-bold uppercase tracking-widest block mb-1.5">Calidad</label>
                     <select
@@ -1027,7 +1122,9 @@ function App() {
             {/* Results Lists (only shown for Equipamiento and Consumibles except Comida) */}
             {selectedMainTab !== "materiales" && selectedCategory !== "71" && (
               <div className="flex-1 flex flex-col min-h-[220px]">
-                <label className="text-[10px] text-slate-400 font-bold uppercase tracking-widest block mb-2.5">3. Selecciona el ítem de la Lista</label>
+                <label className="text-[10px] text-slate-400 font-bold uppercase tracking-widest block mb-2.5">
+                  {selectedMainTab === "artefactos" ? "3. Selecciona el artefacto de la Lista" : "3. Selecciona el ítem de la Lista"}
+                </label>
                 <div className="flex-1 bg-slate-950/50 border border-albion-border/30 rounded-md overflow-y-auto lg:max-h-[250px] max-h-[350px]">
                   {searchResults.length === 0 ? (
                     <div className="h-full flex flex-col items-center justify-center p-6 text-slate-600 text-center">
@@ -1189,7 +1286,7 @@ function App() {
                         </thead>
                         <tbody className="divide-y divide-albion-border/20 text-xs font-medium">
                           {pricesData.prices.map((p, i) => {
-                            const isCheapestBuy = p.city === pricesData.recommendation.buy_city && p.sell_price_min === pricesData.recommendation.buy_price;
+                            const isCheapestBuy = p.city.trim().toLowerCase() !== "black market" && p.city === pricesData.recommendation.buy_city && p.sell_price_min === pricesData.recommendation.buy_price;
                             const isBestSell = pricesData.recommendation.sell_city !== "N/A" && p.city === pricesData.recommendation.sell_city && p.buy_price_max === pricesData.recommendation.sell_price;
                             
                             return (
@@ -1679,11 +1776,28 @@ function App() {
             useCORS: true,
             backgroundColor: "#0a0c10",
             scale: 2
-          }).then(canvas => {
-            const link = document.createElement("a");
-            link.download = `muerte_${selectedDeath.victim_name}_${selectedDeath.event_id}.png`;
-            link.href = canvas.toDataURL("image/png");
-            link.click();
+          }).then(async (canvas) => {
+            const dataUrl = canvas.toDataURL("image/png");
+            const filename = `muerte_${selectedDeath.victim_name}_${selectedDeath.event_id}.png`;
+            
+            if (window.pywebview && window.pywebview.api && !api.current.isMock) {
+              try {
+                const res = await api.current.saveScreenshot(dataUrl, filename);
+                if (res && res.success) {
+                  alert("Captura guardada con éxito en:\n" + res.saved_path);
+                } else if (res && res.error && res.error !== "Cancelado.") {
+                  alert("Error al guardar captura: " + res.error);
+                }
+              } catch (err) {
+                console.error("Error al guardar captura por API:", err);
+                alert("Error al intentar guardar la captura: " + err.toString());
+              }
+            } else {
+              const link = document.createElement("a");
+              link.download = filename;
+              link.href = dataUrl;
+              link.click();
+            }
           }).catch(err => {
             console.error("Error al generar captura:", err);
             alert("No se pudo generar la captura. Inténtelo de nuevo.");
@@ -1717,9 +1831,14 @@ function App() {
                 <div className="flex items-center gap-3">
                   <button
                     onClick={downloadScreenshot}
-                    className="px-3.5 py-1.5 bg-amber-500/10 hover:bg-amber-500 hover:text-slate-950 border border-albion-gold/30 hover:border-amber-400 rounded text-xs font-bold uppercase tracking-wider transition duration-150 flex items-center gap-2 cursor-pointer"
+                    disabled={loadingDeathImages}
+                    className={`px-3.5 py-1.5 border rounded text-xs font-bold uppercase tracking-wider transition duration-150 flex items-center gap-2 cursor-pointer ${
+                      loadingDeathImages
+                        ? "bg-slate-850 text-slate-500 border-slate-800 cursor-not-allowed opacity-60"
+                        : "bg-amber-500/10 hover:bg-amber-500 hover:text-slate-950 border-albion-gold/30 hover:border-amber-400"
+                    }`}
                   >
-                    <span>📷</span> Descargar Captura
+                    <span>📷</span> {loadingDeathImages ? "Cargando..." : "Descargar Captura"}
                   </button>
                   <button
                     onClick={() => setSelectedDeath(null)}
@@ -1778,11 +1897,11 @@ function App() {
                               >
                                 {item ? (
                                   <>
-                                    <LazyLoadImage
-                                      src={`https://render.albiononline.com/v1/item/${item.id}.png`}
-                                      effect="blur"
+                                    <img
+                                      src={deathItemImages[item.id] || `https://render.albiononline.com/v1/item/${item.id}.png`}
                                       className="w-12 h-12 object-contain"
                                       alt={item.name}
+                                      crossOrigin="anonymous"
                                     />
                                     {item.count > 1 && (
                                       <span className="absolute bottom-0.5 right-1 text-[9px] font-mono font-bold bg-slate-950/90 text-amber-400 px-1 rounded border border-albion-gold/20 leading-none">
@@ -1824,11 +1943,11 @@ function App() {
                                 className={`w-12 h-12 rounded border flex items-center justify-center relative overflow-hidden group/inv ${invQClass}`}
                                 title={`${item.name} x${item.count} (${QUALITY_NAMES[item.quality] || 'Normal'})`}
                               >
-                                <LazyLoadImage
-                                  src={`https://render.albiononline.com/v1/item/${item.id}.png`}
-                                  effect="blur"
+                                <img
+                                  src={deathItemImages[item.id] || `https://render.albiononline.com/v1/item/${item.id}.png`}
                                   className="w-10 h-10 object-contain"
                                   alt={item.name}
+                                  crossOrigin="anonymous"
                                 />
                                 {item.count > 1 && (
                                   <span className="absolute bottom-0.5 right-0.5 text-[8px] font-mono font-bold bg-slate-950/90 text-slate-300 px-0.5 rounded leading-none">
