@@ -7,8 +7,8 @@ import './App.css';
 const QUALITY_NAMES = {
   1: "Normal",
   2: "Bueno",
-  3: "Sobresaliente",
-  4: "Excelente",
+  3: "Notable",
+  4: "Sobresaliente",
   5: "Obra Maestra"
 };
 
@@ -69,7 +69,7 @@ const getApi = () => {
       await new Promise(resolve => setTimeout(resolve, 2000));
       return { success: true };
     },
-    searchItems: async (categoryId, query) => {
+    searchItems: async (categoryId, query, subCategory = "") => {
       await new Promise(resolve => setTimeout(resolve, 400));
       const mockDb = {
         "1": [
@@ -106,7 +106,21 @@ const getApi = () => {
         ],
         "5": [
           "Capa del iniciado",
-          "Bolsa del iniciado"
+          "Capa de Bridgewatch del iniciado",
+          "Capa de Fort Sterling del iniciado",
+          "Capa de Lymhurst del iniciado",
+          "Capa de Martlock del iniciado",
+          "Capa de Thetford del iniciado",
+          "Capa de Caerleon del iniciado",
+          "Capa de Brecilien del iniciado",
+          "Capa avaloniana del iniciado",
+          "Capa hereje del iniciado",
+          "Capa de muerto viviente del iniciado",
+          "Capa de guardián del iniciado",
+          "Capa de Morgana del iniciado",
+          "Capa demoníaca del iniciado",
+          "Bolsa del iniciado",
+          "Bolsa de visión del iniciado"
         ],
         "8": [
           "Runa del iniciado",
@@ -134,9 +148,37 @@ const getApi = () => {
         ? items.filter(item => item.toLowerCase().includes(query.toLowerCase()))
         : items;
         
-      return filtered.slice(0, 10).map(item => {
+      let mapped = filtered.slice(0, 50).map(item => {
         let itemId = idMap[categoryId] || "T4_CAPE";
-        if (categoryId === "8") {
+        if (categoryId === "2") {
+          if (item.includes("placas")) itemId = "T4_ARMOR_PLATE_SET1";
+          else if (item.includes("mercenario")) itemId = "T4_ARMOR_LEATHER_SET1";
+          else if (item.includes("erudito")) itemId = "T4_ARMOR_CLOTH_SET1";
+        } else if (categoryId === "3") {
+          if (item.includes("soldado")) itemId = "T4_HEAD_PLATE_SET1";
+          else if (item.includes("cazador")) itemId = "T4_HEAD_LEATHER_SET1";
+          else if (item.includes("mago")) itemId = "T4_HEAD_CLOTH_SET1";
+        } else if (categoryId === "4") {
+          if (item.includes("soldado")) itemId = "T4_SHOES_PLATE_SET1";
+          else if (item.includes("cuero")) itemId = "T4_SHOES_LEATHER_SET1";
+          else if (item.includes("erudito")) itemId = "T4_SHOES_CLOTH_SET1";
+        } else if (categoryId === "5") {
+          if (item.includes("Bolsa")) itemId = "T4_BAG";
+          else if (item.includes("Bridgewatch")) itemId = "T4_CAPEITEM_FW_BRIDGEWATCH";
+          else if (item.includes("Fort Sterling")) itemId = "T4_CAPEITEM_FW_FORTSTERLING";
+          else if (item.includes("Lymhurst")) itemId = "T4_CAPEITEM_FW_LYMHURST";
+          else if (item.includes("Martlock")) itemId = "T4_CAPEITEM_FW_MARTLOCK";
+          else if (item.includes("Thetford")) itemId = "T4_CAPEITEM_FW_THETFORD";
+          else if (item.includes("Caerleon")) itemId = "T4_CAPEITEM_FW_CAERLEON";
+          else if (item.includes("Brecilien")) itemId = "T4_CAPEITEM_FW_BRECILIEN";
+          else if (item.includes("avaloniana")) itemId = "T4_CAPEITEM_AVALON";
+          else if (item.includes("hereje")) itemId = "T4_CAPEITEM_HERETIC";
+          else if (item.includes("muerto viviente")) itemId = "T4_CAPEITEM_UNDEAD";
+          else if (item.includes("guardián")) itemId = "T4_CAPEITEM_KEEPER";
+          else if (item.includes("Morgana")) itemId = "T4_CAPEITEM_MORGANA";
+          else if (item.includes("demoníaca")) itemId = "T4_CAPEITEM_DEMON";
+          else itemId = "T4_CAPE";
+        } else if (categoryId === "8") {
           if (item.includes("Runa")) itemId = "T4_RUNE";
           else if (item.includes("Alma")) itemId = "T4_SOUL";
           else if (item.includes("Reliquia")) itemId = "T4_RELIC";
@@ -146,6 +188,23 @@ const getApi = () => {
           id: itemId
         };
       });
+
+      if (subCategory) {
+        const sub = subCategory.toUpperCase();
+        if (sub === "PLACA") {
+          mapped = mapped.filter(x => x.id.includes("_PLATE_"));
+        } else if (sub === "CUERO") {
+          mapped = mapped.filter(x => x.id.includes("_LEATHER_"));
+        } else if (sub === "TELA") {
+          mapped = mapped.filter(x => x.id.includes("_CLOTH_"));
+        } else if (sub === "CAPA") {
+          mapped = mapped.filter(x => x.id.includes("_CAPE"));
+        } else if (sub === "BOLSA") {
+          mapped = mapped.filter(x => x.id.includes("_BAG"));
+        }
+      }
+
+      return mapped;
     },
     getPrices: async (selectedName, tierChoice, encChoice, qualityChoice, server) => {
       await new Promise(resolve => setTimeout(resolve, 1000));
@@ -224,13 +283,72 @@ const getApi = () => {
         return [
           { tier: "4", id: `T4_${idSuffix}`, name: `${itemName} del iniciado` },
           { tier: "5", id: `T5_${idSuffix}`, name: `${itemName} del experto` },
-          { tier: "6", id: `T6_${idSuffix}`, name: `${itemName} del maestro` }
+          { tier: "6", id: `T6_${idSuffix}`, name: `${itemName} del maestro` },
+          { tier: "7", id: `T7_${idSuffix}`, name: `${itemName} del gran maestro` },
+          { tier: "8", id: `T8_${idSuffix}`, name: `${itemName} del anciano` }
         ];
       }
-      return [
-        { tier: "4", id: "T4_CAPE", name: "Capa de iniciado" },
-        { tier: "5", id: "T5_CAPE", name: "Capa de experto" }
-      ];
+
+      let baseId = "T4_CAPE";
+      let startTier = 4;
+      
+      if (itemName.includes("Bolsa")) {
+        baseId = "T4_BAG";
+        startTier = 2;
+      } else if (itemName.includes("Capa") || itemName.includes("Crest") || itemName.includes("Insignia")) {
+        if (itemName.includes("Bridgewatch")) baseId = "T4_CAPEITEM_FW_BRIDGEWATCH";
+        else if (itemName.includes("Fort Sterling")) baseId = "T4_CAPEITEM_FW_FORTSTERLING";
+        else if (itemName.includes("Lymhurst")) baseId = "T4_CAPEITEM_FW_LYMHURST";
+        else if (itemName.includes("Martlock")) baseId = "T4_CAPEITEM_FW_MARTLOCK";
+        else if (itemName.includes("Thetford")) baseId = "T4_CAPEITEM_FW_THETFORD";
+        else if (itemName.includes("Caerleon")) baseId = "T4_CAPEITEM_FW_CAERLEON";
+        else if (itemName.includes("Brecilien")) baseId = "T4_CAPEITEM_FW_BRECILIEN";
+        else if (itemName.includes("avaloniana")) baseId = "T4_CAPEITEM_AVALON";
+        else if (itemName.includes("hereje")) baseId = "T4_CAPEITEM_HERETIC";
+        else if (itemName.includes("muerto viviente")) baseId = "T4_CAPEITEM_UNDEAD";
+        else if (itemName.includes("guardián")) baseId = "T4_CAPEITEM_KEEPER";
+        else if (itemName.includes("Morgana")) baseId = "T4_CAPEITEM_MORGANA";
+        else if (itemName.includes("demoníaca")) baseId = "T4_CAPEITEM_DEMON";
+        else {
+          baseId = "T4_CAPE";
+          startTier = 2;
+        }
+      } else if (itemName.includes("Arco")) {
+        baseId = "T4_2H_BOW_BADON";
+      } else if (itemName.includes("Armadura") || itemName.includes("Chaqueta") || itemName.includes("Toga")) {
+        if (itemName.includes("placas")) baseId = "T4_ARMOR_PLATE_SET1";
+        else if (itemName.includes("mercenario")) baseId = "T4_ARMOR_LEATHER_SET1";
+        else baseId = "T4_ARMOR_CLOTH_SET1";
+      } else if (itemName.includes("Casco") || itemName.includes("Capucha") || itemName.includes("Hábito")) {
+        if (itemName.includes("soldado")) baseId = "T4_HEAD_PLATE_SET1";
+        else if (itemName.includes("cazador")) baseId = "T4_HEAD_LEATHER_SET1";
+        else baseId = "T4_HEAD_CLOTH_SET1";
+      } else if (itemName.includes("Botas") || itemName.includes("Zapatos") || itemName.includes("Sandalias")) {
+        startTier = 2;
+        if (itemName.includes("soldado")) baseId = "T4_SHOES_PLATE_SET1";
+        else if (itemName.includes("cuero")) baseId = "T4_SHOES_LEATHER_SET1";
+        else baseId = "T4_SHOES_CLOTH_SET1";
+      }
+
+      const tiers = [];
+      const suffixes = {
+        2: " del principiante",
+        3: " del novato",
+        4: " del iniciado",
+        5: " del experto",
+        6: " del maestro",
+        7: " del gran maestro",
+        8: " del anciano"
+      };
+
+      for (let t = startTier; t <= 8; t++) {
+        tiers.push({
+          tier: t.toString(),
+          id: baseId.replace(/^T[1-8]/, `T${t}`),
+          name: itemName + (suffixes[t] || "")
+        });
+      }
+      return tiers;
     },
     getRiskRadar: async (server) => {
       await new Promise(resolve => setTimeout(resolve, 800));
@@ -294,7 +412,7 @@ const getApi = () => {
           ]
         },
         {
-          name: "Lymhurst Portal Area",
+          name: "Timberwood Dell",
           type: "Black Zone",
           death_count: 1,
           avg_group_size: 1.0,
@@ -321,18 +439,6 @@ const getApi = () => {
               equipment: []
             }
           ]
-        },
-        {
-          name: "Bridgewatch Portal Area",
-          type: "Black Zone",
-          death_count: 0,
-          avg_group_size: 0,
-          avg_killer_ip: 0,
-          risk_level: "green",
-          survival_gathering: 98,
-          survival_farming: 99,
-          survival_transport: 96,
-          deaths: []
         }
       ];
       return {
@@ -340,9 +446,226 @@ const getApi = () => {
         zones: mockZones,
         total_kills: 13
       };
+    },
+    searchZones: async (query) => {
+      await new Promise(resolve => setTimeout(resolve, 50));
+      if (!window.__mockZones) {
+        window.__mockZones = [
+          { id: "blackthorn_quarry", n: "Blackthorn Quarry", t: 6, b: "black", fav: false, p: 0, tags: ["pvp"], recent: true },
+          { id: "dryvein_cross", n: "Dryvein Cross", t: 5, b: "red", fav: true, p: 1, tags: ["farm"], recent: true },
+          { id: "murkweald", n: "Murkweald", t: 6, b: "red", fav: false, p: 0, tags: [], recent: true },
+          { id: "redtree_enclave", n: "Redtree Enclave", t: 8, b: "black", fav: true, p: 1, tags: ["danger", "fame"], recent: false },
+          { id: "creag_garr", n: "Creag Garr", t: 6, b: "red", fav: false, p: 0, tags: [], recent: false },
+          { id: "runnelvein_bog", n: "Runnelvein Bog", t: 6, b: "red", fav: false, p: 0, tags: [], recent: false }
+        ];
+      }
+      if (!window.__mockRecentZones) {
+        window.__mockRecentZones = ["Blackthorn Quarry", "Dryvein Cross", "Murkweald"];
+      }
+      
+      const q = query.trim().toLowerCase();
+      const filtered = q
+        ? window.__mockZones.filter(z => z.n.toLowerCase().includes(q))
+        : window.__mockZones;
+        
+      return filtered.map(z => ({
+        ...z,
+        recent: window.__mockRecentZones.includes(z.n)
+      })).sort((a, b) => {
+        const aRecent = window.__mockRecentZones.includes(a.n);
+        const bRecent = window.__mockRecentZones.includes(b.n);
+        if (aRecent && !bRecent) return -1;
+        if (!aRecent && bRecent) return 1;
+        if (aRecent && bRecent) {
+          return window.__mockRecentZones.indexOf(a.n) - window.__mockRecentZones.indexOf(b.n);
+        }
+        return b.t - a.t;
+      });
+    },
+    addZone: async (zone_data) => {
+      await new Promise(resolve => setTimeout(resolve, 50));
+      if (!window.__mockZones) window.__mockZones = [];
+      const newZone = {
+        id: zone_data.n.toLowerCase().replace(/ /g, "_"),
+        n: zone_data.n,
+        t: parseInt(zone_data.t) || 5,
+        b: zone_data.b || "black",
+        fav: !!zone_data.fav,
+        p: parseInt(zone_data.p) || 0,
+        tags: zone_data.tags || [],
+        recent: false
+      };
+      window.__mockZones.push(newZone);
+      return { success: true, zone: newZone };
+    },
+    updateZone: async (zone_id, updated_data) => {
+      await new Promise(resolve => setTimeout(resolve, 50));
+      if (!window.__mockZones) return { success: false, error: "Database not loaded" };
+      const idx = window.__mockZones.findIndex(z => z.id === zone_id);
+      if (idx !== -1) {
+        window.__mockZones[idx] = {
+          ...window.__mockZones[idx],
+          ...updated_data,
+          id: updated_data.n ? updated_data.n.toLowerCase().replace(/ /g, "_") : window.__mockZones[idx].id
+        };
+        return { success: true, zone: window.__mockZones[idx] };
+      }
+      return { success: false, error: "Zone not found" };
+    },
+    deleteZone: async (zone_id) => {
+      await new Promise(resolve => setTimeout(resolve, 50));
+      if (!window.__mockZones) return { success: false, error: "Database not loaded" };
+      const idx = window.__mockZones.findIndex(z => z.id === zone_id);
+      if (idx !== -1) {
+        const zone = window.__mockZones[idx];
+        window.__mockZones.splice(idx, 1);
+        if (window.__mockRecentZones) {
+          window.__mockRecentZones = window.__mockRecentZones.filter(n => n !== zone.n);
+        }
+        return { success: true };
+      }
+      return { success: false, error: "Zone not found" };
+    },
+    getRecentZones: async () => {
+      return window.__mockRecentZones || ["Blackthorn Quarry", "Dryvein Cross", "Murkweald"];
+    },
+    addRecentZone: async (zone_name) => {
+      if (!window.__mockRecentZones) window.__mockRecentZones = ["Blackthorn Quarry", "Dryvein Cross", "Murkweald"];
+      window.__mockRecentZones = window.__mockRecentZones.filter(n => n !== zone_name);
+      window.__mockRecentZones.unshift(zone_name);
+      window.__mockRecentZones = window.__mockRecentZones.slice(0, 10);
+      return { success: true, recent_zones: window.__mockRecentZones };
     }
   };
 };
+
+const SUGGESTED_WORLD_ZONES = [
+  { n: "Redtree Enclave", t: 8, b: "black" },
+  { n: "Timberwood Dell", t: 6, b: "black" },
+  { n: "Drownhole Fen", t: 7, b: "black" },
+  { n: "Razorrock Ravine", t: 7, b: "black" },
+  { n: "Mardu", t: 6, b: "black" },
+  { n: "Gravemound Slope", t: 7, b: "black" },
+  { n: "Whitecleave", t: 8, b: "black" },
+  { n: "Sandstone Deep", t: 7, b: "black" },
+  { n: "Blackthorn Quarry", t: 6, b: "black" },
+  { n: "Wanderers Rest", t: 6, b: "black" },
+  { n: "Slithervent Canyon", t: 8, b: "black" },
+  { n: "Death-reach Gorge", t: 7, b: "black" },
+  { n: "Lymhurst Portal Area", t: 5, b: "black" },
+  { n: "Fort Sterling Portal Area", t: 5, b: "black" },
+  { n: "Thetford Portal Area", t: 5, b: "black" },
+  { n: "Martlock Portal Area", t: 5, b: "black" },
+  { n: "Bridgewatch Portal Area", t: 5, b: "black" },
+  { n: "Brecilien Portal Area", t: 5, b: "black" },
+  { n: "Archers Keep", t: 6, b: "black" },
+  { n: "Mage's Rest", t: 6, b: "black" },
+  { n: "Morgana's Shadow", t: 6, b: "black" },
+  { n: "Guards Wood", t: 6, b: "black" },
+  { n: "Blackwood", t: 6, b: "black" },
+  { n: "Thornwood", t: 6, b: "black" },
+  { n: "Greenwood", t: 6, b: "black" },
+  { n: "Aspenwood", t: 7, b: "black" },
+  { n: "Eldwood", t: 8, b: "black" },
+  { n: "Stonewood", t: 7, b: "black" },
+  { n: "Ironwood", t: 8, b: "black" },
+  { n: "Deepwood", t: 7, b: "black" },
+  { n: "Wetwood", t: 6, b: "black" },
+  { n: "Driftwood", t: 6, b: "black" },
+  { n: "Saltwood", t: 6, b: "black" },
+  { n: "Shorewood", t: 6, b: "black" },
+  { n: "Siltwood", t: 6, b: "black" },
+  { n: "Claywood", t: 6, b: "black" },
+  { n: "Swampwood", t: 6, b: "black" },
+  { n: "Bogwood", t: 6, b: "black" },
+  { n: "Fenwood", t: 6, b: "black" },
+  { n: "Marshwood", t: 6, b: "black" },
+  { n: "Mirewood", t: 6, b: "black" },
+  { n: "Heathwood", t: 6, b: "black" },
+  { n: "Peatwood", t: 6, b: "black" },
+  { n: "Gripwood", t: 6, b: "black" },
+  { n: "Tanglewood", t: 7, b: "black" },
+  { n: "Bramblewood", t: 7, b: "black" },
+  { n: "Brushwood", t: 6, b: "black" },
+  { n: "Shrubwood", t: 6, b: "black" },
+  { n: "Fernwood", t: 6, b: "black" },
+  { n: "Ivywood", t: 6, b: "black" },
+  { n: "Vinewood", t: 6, b: "black" },
+  { n: "Mosswood", t: 6, b: "black" },
+  { n: "Lichenwood", t: 6, b: "black" },
+  { n: "Fungiwood", t: 6, b: "black" },
+  { n: "Sporewood", t: 6, b: "black" },
+  { n: "Mouldwood", t: 6, b: "black" },
+  { n: "Rootwood", t: 6, b: "black" },
+  { n: "Barkwood", t: 6, b: "black" },
+  { n: "Twigwood", t: 6, b: "black" },
+  { n: "Branchwood", t: 6, b: "black" },
+  { n: "Leafwood", t: 6, b: "black" },
+  { n: "Budwood", t: 6, b: "black" },
+  { n: "Flowerwood", t: 6, b: "black" },
+  { n: "Seedwood", t: 6, b: "black" },
+  { n: "Nutwood", t: 6, b: "black" },
+  { n: "Berrywood", t: 6, b: "black" },
+  { n: "Fruitwood", t: 6, b: "black" },
+  { n: "Orchardwood", t: 6, b: "black" },
+  { n: "Grovewood", t: 6, b: "black" },
+  { n: "Copsewood", t: 6, b: "black" },
+  { n: "Spinneywood", t: 6, b: "black" },
+  { n: "Thickwood", t: 6, b: "black" },
+  { n: "Wildwood", t: 7, b: "black" },
+  { n: "Primevalwood", t: 8, b: "black" },
+  { n: "Creag Garr", t: 6, b: "red" },
+  { n: "Runnelvein Bog", t: 6, b: "red" },
+  { n: "Saddleback Pass", t: 6, b: "red" },
+  { n: "Highland Cross", t: 3, b: "red" },
+  { n: "Swamp Cross", t: 3, b: "red" },
+  { n: "Mountain Cross", t: 3, b: "red" },
+  { n: "Steppe Cross", t: 3, b: "red" },
+  { n: "Forest Cross", t: 3, b: "red" },
+  { n: "Caerleon Outskirts", t: 6, b: "red" },
+  { n: "Axe Head", t: 5, b: "red" },
+  { n: "Barkway", t: 5, b: "red" },
+  { n: "Birchwood", t: 5, b: "red" },
+  { n: "Bleachwood Fens", t: 5, b: "red" },
+  { n: "Burnt Oak", t: 5, b: "red" },
+  { n: "Deadvein Gulch", t: 5, b: "red" },
+  { n: "Dryvein Cross", t: 5, b: "red" },
+  { n: "Gorge", t: 5, b: "red" },
+  { n: "Grovethorn", t: 5, b: "red" },
+  { n: "Murkweald", t: 6, b: "red" },
+  { n: "Sunkenbogs", t: 6, b: "red" },
+  { n: "Wayward Wood", t: 5, b: "red" },
+  { n: "Cairn Camain", t: 5, b: "red" },
+  { n: "Cairn Glascore", t: 5, b: "red" },
+  { n: "Cairn Gera", t: 5, b: "red" },
+  { n: "Cairn Darrow", t: 5, b: "red" },
+  { n: "Cairn Tor", t: 5, b: "red" },
+  { n: "Breckland", t: 5, b: "red" },
+  { n: "Brakebush Wood", t: 5, b: "red" },
+  { n: "Longbow Mountain", t: 5, b: "red" },
+  { n: "Stony Chimney", t: 5, b: "red" },
+  { n: "Rowanwood", t: 5, b: "red" },
+  { n: "Oakwood", t: 5, b: "red" },
+  { n: "Willow Wood", t: 5, b: "red" },
+  { n: "Yew Wood", t: 5, b: "red" },
+  { n: "Chestnut Wood", t: 5, b: "red" },
+  { n: "Elmwood", t: 5, b: "red" },
+  { n: "Ashwood", t: 5, b: "red" },
+  { n: "Alderwood", t: 5, b: "red" },
+  { n: "Cedarwood", t: 5, b: "red" },
+  { n: "Redwood", t: 5, b: "red" },
+  { n: "Pine Wood", t: 5, b: "red" },
+  { n: "Fir Wood", t: 5, b: "red" },
+  { n: "Larchwood", t: 5, b: "red" },
+  { n: "Sprucewood", t: 5, b: "red" },
+  { n: "Hemlockwood", t: 5, b: "red" },
+  { n: "Cypresswood", t: 5, b: "red" },
+  { n: "Juniperwood", t: 5, b: "red" },
+  { n: "Tamarackwood", t: 5, b: "red" },
+  { n: "Dogwood", t: 5, b: "red" },
+  { n: "Maplewood", t: 5, b: "red" },
+  { n: "Beechwood", t: 5, b: "red" }
+];
 
 function App() {
   const [dbLoaded, setDbLoaded] = useState(false);
@@ -363,6 +686,7 @@ function App() {
   const [enchantment, setEnchantment] = useState("");
   const [quality, setQuality] = useState("");
   const [server, setServer] = useState("west");
+  const [subCategory, setSubCategory] = useState("");
   
   const [pricesLoading, setPricesLoading] = useState(false);
   const [pricesData, setPricesData] = useState(null);
@@ -380,6 +704,185 @@ function App() {
   const [radarFilterRisk, setRadarFilterRisk] = useState("All"); // "All", "red", "orange", "yellow", "green"
   const [lastRadarUpdate, setLastRadarUpdate] = useState(null);
   const [refreshCountdown, setRefreshCountdown] = useState(45);
+
+  // Estados para la gestión y búsqueda de mapas
+  const [showManageModal, setShowManageModal] = useState(false);
+  const [manageTab, setManageTab] = useState("all"); // "all", "favs", "recents"
+  const [zonesList, setZonesList] = useState([]);
+  const [newZoneName, setNewZoneName] = useState("");
+  const [newZoneTier, setNewZoneTier] = useState("all");
+  const [newZoneBiome, setNewZoneBiome] = useState("all");
+  const [editingZoneId, setEditingZoneId] = useState(null);
+  const [editingZoneData, setEditingZoneData] = useState({});
+  const [manageSearchQuery, setManageSearchQuery] = useState("");
+  const [showAddSuggestions, setShowAddSuggestions] = useState(false);
+
+  const [radarAutocompleteQuery, setRadarAutocompleteQuery] = useState("");
+  const [radarSuggestions, setRadarSuggestions] = useState([]);
+  const [showRadarDropdown, setShowRadarDropdown] = useState(false);
+  const [recentZonesFromDb, setRecentZonesFromDb] = useState([]);
+
+  const refreshZonesList = async () => {
+    if (!api.current) return;
+    try {
+      const allZones = await api.current.searchZones("");
+      setZonesList(allZones || []);
+      const recents = await api.current.getRecentZones();
+      setRecentZonesFromDb(recents || []);
+    } catch (err) {
+      console.error("Error refreshing zones list:", err);
+    }
+  };
+
+  const handleSelectZoneSuggestion = async (zoneName, zoneBiome, zoneTier) => {
+    if (!api.current) return;
+    try {
+      await api.current.addRecentZone(zoneName);
+      
+      // Seleccionar la zona en la UI
+      if (radarData && radarData.zones) {
+        const found = radarData.zones.find(z => z.name.toLowerCase() === zoneName.toLowerCase());
+        if (found) {
+          setSelectedZone(found);
+        } else {
+          const safeZone = {
+            name: zoneName,
+            type: zoneBiome === "black" ? "Black Zone" : "Red Zone",
+            death_count: 0,
+            avg_group_size: 0,
+            avg_killer_ip: 0,
+            risk_level: "green",
+            survival_gathering: 98,
+            survival_farming: 99,
+            survival_transport: 96,
+            deaths: []
+          };
+          setSelectedZone(safeZone);
+        }
+      }
+      
+      setRadarAutocompleteQuery("");
+      setShowRadarDropdown(false);
+      refreshZonesList();
+    } catch (err) {
+      console.error("Error selecting zone suggestion:", err);
+    }
+  };
+
+  const handleToggleFavorite = async (zone) => {
+    if (!api.current) return;
+    try {
+      await api.current.updateZone(zone.id, { fav: !zone.fav });
+      refreshZonesList();
+    } catch (err) {
+      console.error("Error toggling favorite:", err);
+    }
+  };
+
+  const handleTogglePriority = async (zone) => {
+    if (!api.current) return;
+    try {
+      await api.current.updateZone(zone.id, { p: zone.p === 1 ? 0 : 1 });
+      refreshZonesList();
+    } catch (err) {
+      console.error("Error toggling priority:", err);
+    }
+  };
+
+  const handleDeleteZone = async (zoneId) => {
+    if (!api.current) return;
+    if (window.confirm("¿Estás seguro de que deseas eliminar esta zona?")) {
+      try {
+        const res = await api.current.deleteZone(zoneId);
+        if (res.success) {
+          refreshZonesList();
+        } else {
+          alert("Error: " + res.error);
+        }
+      } catch (err) {
+        console.error("Error deleting zone:", err);
+      }
+    }
+  };
+
+  const handleAddZone = async (e) => {
+    if (e) e.preventDefault();
+    if (!api.current) return;
+    if (!newZoneName.trim()) return;
+    
+    const matchedSuggested = SUGGESTED_WORLD_ZONES.find(
+      z => z.n.toLowerCase() === newZoneName.trim().toLowerCase()
+    );
+    
+    if (!matchedSuggested) {
+      alert("Debes seleccionar una zona válida de la lista de sugerencias. Solo se permiten mapas reales de Albion Online.");
+      return;
+    }
+    
+    try {
+      const res = await api.current.addZone({
+        n: matchedSuggested.n, // Usamos la capitalización exacta de la base de datos
+        t: matchedSuggested.t,
+        b: matchedSuggested.b,
+        fav: false,
+        p: 0,
+        tags: []
+      });
+      
+      if (res.success) {
+        setNewZoneName("");
+        refreshZonesList();
+      } else {
+        alert("Error al agregar mapa: " + res.error);
+      }
+    } catch (err) {
+      console.error("Error adding zone:", err);
+    }
+  };
+
+  const handleUpdateZoneInline = async (zoneId) => {
+    if (!api.current) return;
+    try {
+      const res = await api.current.updateZone(zoneId, {
+        n: editingZoneData.n,
+        t: parseInt(editingZoneData.t),
+        b: editingZoneData.b,
+        p: parseInt(editingZoneData.p),
+        tags: typeof editingZoneData.tags === "string" 
+          ? editingZoneData.tags.split(",").map(t => t.trim()).filter(Boolean)
+          : editingZoneData.tags
+      });
+      
+      if (res.success) {
+        setEditingZoneId(null);
+        refreshZonesList();
+      } else {
+        alert("Error al actualizar mapa: " + res.error);
+      }
+    } catch (err) {
+      console.error("Error updating zone:", err);
+    }
+  };
+
+  // Autocompletado del buscador de mapas
+  useEffect(() => {
+    if (!dbLoaded || !api.current) return;
+    
+    const fetchRadarSuggestions = async () => {
+      try {
+        const suggestions = await api.current.searchZones(radarAutocompleteQuery);
+        setRadarSuggestions(suggestions || []);
+      } catch (err) {
+        console.error("Error fetching radar suggestions:", err);
+      }
+    };
+
+    const delayDebounce = setTimeout(() => {
+      fetchRadarSuggestions();
+    }, 150);
+
+    return () => clearTimeout(delayDebounce);
+  }, [radarAutocompleteQuery, dbLoaded]);
 
   const [deathItemImages, setDeathItemImages] = useState({});
   const [loadingDeathImages, setLoadingDeathImages] = useState(false);
@@ -459,6 +962,9 @@ function App() {
         const res = await api.current.loadDatabase();
         if (res.success) {
           setDbLoaded(true);
+          setTimeout(() => {
+            refreshZonesList();
+          }, 100);
         } else {
           setDbError(res.error || "Error al descargar la base de datos.");
         }
@@ -485,7 +991,7 @@ function App() {
     const delayDebounce = setTimeout(async () => {
       setSearching(true);
       try {
-        const results = await api.current.searchItems(selectedCategory, searchQuery);
+        const results = await api.current.searchItems(selectedCategory, searchQuery, subCategory);
         setSearchResults(results);
       } catch (err) {
         console.error("Error al buscar items:", err);
@@ -495,10 +1001,11 @@ function App() {
     }, 250);
 
     return () => clearTimeout(delayDebounce);
-  }, [searchQuery, selectedCategory, dbLoaded]);
+  }, [searchQuery, selectedCategory, subCategory, dbLoaded]);
 
   const handleSelectCategory = (catId) => {
     setSelectedCategory(catId);
+    setSubCategory("");
     setSearchQuery("");
     setSearchResults([]);
     setSelectedItem(null);
@@ -529,6 +1036,7 @@ function App() {
 
   const handleSelectMainTab = (tab) => {
     setSelectedMainTab(tab);
+    setSubCategory("");
     setSearchQuery("");
     setSearchResults([]);
     setSelectedItem(null);
@@ -849,6 +1357,58 @@ function App() {
               </div>
             )}
 
+            {/* Filtro de Material (Placa, Cuero, Tela) para Armadura, Casco y Botas */}
+            {selectedMainTab === "equipamiento" && (selectedCategory === "2" || selectedCategory === "3" || selectedCategory === "4") && (
+              <div className="animate-fadeIn mt-3.5">
+                <label className="text-[10px] text-slate-400 font-bold uppercase tracking-widest block mb-2">3. Filtro de Material</label>
+                <div className="grid grid-cols-4 gap-1.5 bg-slate-950/80 border border-albion-border/60 p-1.5 rounded-lg shadow-inner">
+                  {[
+                    { id: "", name: "Todos" },
+                    { id: "placa", name: "Placa" },
+                    { id: "cuero", name: "Cuero" },
+                    { id: "tela", name: "Tela" }
+                  ].map(sub => (
+                    <button
+                      key={sub.id}
+                      onClick={() => setSubCategory(sub.id)}
+                      className={`py-1.5 rounded text-[10px] font-bold uppercase tracking-wider transition duration-200 cursor-pointer text-center ${
+                        subCategory === sub.id
+                          ? "bg-amber-500/10 text-albion-gold border border-albion-gold/30 shadow-[0_0_8px_rgba(198,161,82,0.1)]"
+                          : "text-slate-400 hover:text-slate-200 border border-transparent hover:bg-slate-900/40"
+                      }`}
+                    >
+                      {sub.name}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {selectedMainTab === "equipamiento" && selectedCategory === "5" && (
+              <div className="animate-fadeIn mt-3.5">
+                <label className="text-[10px] text-slate-400 font-bold uppercase tracking-widest block mb-2">3. Filtro de Accesorio</label>
+                <div className="grid grid-cols-3 gap-1.5 bg-slate-950/80 border border-albion-border/60 p-1.5 rounded-lg shadow-inner">
+                  {[
+                    { id: "", name: "Todos" },
+                    { id: "capa", name: "Capa" },
+                    { id: "bolsa", name: "Bolsa" }
+                  ].map(sub => (
+                    <button
+                      key={sub.id}
+                      onClick={() => setSubCategory(sub.id)}
+                      className={`py-1.5 rounded text-[10px] font-bold uppercase tracking-wider transition duration-200 cursor-pointer text-center ${
+                        subCategory === sub.id
+                          ? "bg-amber-500/10 text-albion-gold border border-albion-gold/30 shadow-[0_0_8px_rgba(198,161,82,0.1)]"
+                          : "text-slate-400 hover:text-slate-200 border border-transparent hover:bg-slate-900/40"
+                      }`}
+                    >
+                      {sub.name}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+
             {/* Sub-Category Selector (only shown for Consumibles) */}
             {selectedMainTab === "consumibles" && (
               <div className="animate-fadeIn flex flex-col gap-4">
@@ -983,7 +1543,9 @@ function App() {
             {selectedMainTab !== "materiales" && selectedCategory !== "71" && (
               <div className="flex flex-col gap-1.5">
                 <label className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">
-                  {selectedMainTab === "artefactos" ? "2. Buscar Nombre del Artefacto" : "2. Buscar Nombre del Ítem"}
+                  {selectedMainTab === "artefactos" ? "2. Buscar Nombre del Artefacto" : 
+                   (selectedMainTab === "equipamiento" && (selectedCategory === "2" || selectedCategory === "3" || selectedCategory === "4" || selectedCategory === "5")) 
+                   ? "4. Buscar Nombre del Ítem" : "3. Buscar Nombre del Ítem"}
                 </label>
                 <div className="relative">
                   <input
@@ -1090,8 +1652,8 @@ function App() {
                       <option value="">TODOS</option>
                       <option value="1">Normal</option>
                       <option value="2">Bueno (Good)</option>
-                      <option value="3">Sobresaliente (Outstanding)</option>
-                      <option value="4">Excelente (Excellent)</option>
+                      <option value="3">Notable (Outstanding)</option>
+                      <option value="4">Sobresaliente (Excellent)</option>
                       <option value="5">Obra Maestra (Masterpiece)</option>
                     </select>
                   </div>
@@ -1374,23 +1936,96 @@ function App() {
               </div>
             </div>
 
-            {/* Buscador y Filtros */}
-            <div className="flex flex-col gap-3">
+            {/* Buscador Inteligente y Filtros */}
+            <div className="flex flex-col gap-3 relative z-30">
               <div className="relative">
                 <input
                   type="text"
-                  placeholder="Buscar mapa..."
-                  value={radarSearchQuery}
-                  onChange={(e) => setRadarSearchQuery(e.target.value)}
-                  className="w-full bg-slate-950/80 border border-albion-border/80 focus:border-albion-gold text-xs text-slate-200 pl-4.5 pr-8 py-2.5 rounded-md outline-none transition-all placeholder-slate-600 font-semibold"
+                  placeholder="🔍 Buscar mapa por autocompletado..."
+                  value={radarAutocompleteQuery}
+                  onFocus={() => setShowRadarDropdown(true)}
+                  onChange={(e) => {
+                    setRadarAutocompleteQuery(e.target.value);
+                    setRadarSearchQuery(e.target.value);
+                    setShowRadarDropdown(true);
+                  }}
+                  className="w-full bg-slate-950/80 border border-albion-border/80 focus:border-albion-gold text-xs text-slate-200 pl-8 pr-8 py-2.5 rounded-md outline-none transition-all placeholder-slate-600 font-semibold"
                 />
-                {radarSearchQuery && (
+                {(radarAutocompleteQuery || radarSearchQuery) && (
                   <button
-                    onClick={() => setRadarSearchQuery("")}
+                    onClick={() => {
+                      setRadarAutocompleteQuery("");
+                      setRadarSearchQuery("");
+                      setRadarSuggestions([]);
+                    }}
                     className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-600 hover:text-slate-300 text-[10px] font-bold"
                   >
                     ✕
                   </button>
+                )}
+
+                {/* Autocomplete Dropdown List */}
+                {showRadarDropdown && (
+                  <>
+                    <div 
+                      className="fixed inset-0 z-40" 
+                      onClick={() => setShowRadarDropdown(false)}
+                    />
+                    <div className="absolute top-full left-0 right-0 mt-1 bg-slate-950/95 border border-albion-border rounded-md shadow-2xl overflow-y-auto max-h-[220px] z-50 divide-y divide-albion-border/20 backdrop-blur-md animate-fadeIn">
+                      {radarSuggestions.length === 0 ? (
+                        <div className="p-3 text-[11px] text-slate-500 italic text-center">
+                          No se encontraron zonas que coincidan.
+                        </div>
+                      ) : (
+                        radarSuggestions.map((suggestion) => {
+                          const tierColors = {
+                            8: "text-amber-400 border-amber-400/30 bg-amber-400/5",
+                            7: "text-purple-400 border-purple-400/30 bg-purple-400/5",
+                            6: "text-blue-400 border-blue-400/30 bg-blue-400/5",
+                            5: "text-emerald-400 border-emerald-400/30 bg-emerald-400/5",
+                            4: "text-slate-300 border-slate-300/30 bg-slate-300/5",
+                            3: "text-slate-400 border-slate-400/30 bg-slate-400/5"
+                          };
+                          const tColor = tierColors[suggestion.t] || tierColors[5];
+                          
+                          return (
+                            <button
+                              key={suggestion.id}
+                              onClick={() => handleSelectZoneSuggestion(suggestion.n, suggestion.b, suggestion.t)}
+                              className="w-full text-left px-3.5 py-2.5 hover:bg-slate-900/60 transition-colors flex items-center justify-between text-xs font-semibold group cursor-pointer"
+                            >
+                              <div className="flex items-center gap-2 min-w-0">
+                                <span className={`text-[9px] px-1.5 py-0.5 rounded border ${tColor} font-bold font-mono shrink-0`}>
+                                  T{suggestion.t}
+                                </span>
+                                <span className="text-slate-200 group-hover:text-albion-gold truncate">
+                                  {suggestion.n}
+                                </span>
+                                {suggestion.recent && (
+                                  <span className="text-[10px] text-slate-500 font-normal" title="Reciente">
+                                    🕒
+                                  </span>
+                                )}
+                                {suggestion.fav && (
+                                  <span className="text-[10px] text-amber-500" title="Favorito">
+                                    ⭐
+                                  </span>
+                                )}
+                                {suggestion.p === 1 && (
+                                  <span className="bg-red-500/20 text-red-400 text-[8px] font-bold px-1 rounded uppercase tracking-wider scale-90">
+                                    Prioritario
+                                  </span>
+                                )}
+                              </div>
+                              <span className={`text-[10px] font-bold uppercase tracking-wider ${suggestion.b === 'black' ? 'text-purple-500' : suggestion.b === 'red' ? 'text-red-500' : 'text-slate-400'}`}>
+                                {suggestion.b === 'black' ? 'Negra' : suggestion.b === 'red' ? 'Roja' : suggestion.b}
+                              </span>
+                            </button>
+                          );
+                        })
+                      )}
+                    </div>
+                  </>
                 )}
               </div>
 
@@ -1421,15 +2056,26 @@ function App() {
                     <option value="yellow">Precaución (Amarillo)</option>
                     <option value="green">Seguro (Verde)</option>
                   </select>
-                </div>
               </div>
             </div>
+          </div>
 
             {/* Listado de Zonas */}
             <div className="flex-1 flex flex-col min-h-[300px]">
-              <label className="text-[10px] text-slate-400 font-bold uppercase tracking-widest block mb-2.5">
-                Mapas Analizados ({radarData ? radarData.zones.length : 0})
-              </label>
+              <div className="flex justify-between items-center mb-2.5">
+                <label className="text-[10px] text-slate-400 font-bold uppercase tracking-widest block">
+                  Mapas Analizados ({radarData ? radarData.zones.length : 0})
+                </label>
+                <button
+                  onClick={() => {
+                    refreshZonesList();
+                    setShowManageModal(true);
+                  }}
+                  className="px-2.5 py-1 bg-slate-900 border border-albion-border/80 hover:border-albion-gold text-slate-300 hover:text-albion-gold text-[10px] font-bold rounded transition flex items-center gap-1.5 cursor-pointer uppercase tracking-wider shadow-[0_0_8px_rgba(0,0,0,0.4)]"
+                >
+                  ⚙️ Gestionar Mapas
+                </button>
+              </div>
 
               {radarLoading && !radarData && (
                 <div className="flex-1 flex flex-col items-center justify-center p-6 text-center">
@@ -1475,7 +2121,14 @@ function App() {
                           }`}
                         >
                           <div className="flex flex-col gap-0.5 min-w-0 pr-2">
-                            <span className="font-bold truncate">{zone.name}</span>
+                            <span className="font-bold truncate flex items-center gap-1.5">
+                              {zone.name}
+                              {zone.p === 1 && (
+                                <span className="bg-red-500/20 text-red-400 text-[8px] font-bold px-1.5 py-0.2 rounded uppercase tracking-wider scale-90 border border-red-500/30" title="Alta Prioridad">
+                                  🚨 Prioritario
+                                </span>
+                              )}
+                            </span>
                             <span className="text-[9px] text-slate-500 font-medium">
                               {zone.type} • {zone.death_count} {zone.death_count === 1 ? 'muerte' : 'muertes'}
                             </span>
@@ -1812,8 +2465,8 @@ function App() {
         const getQualityBorderClass = (quality) => {
           switch(quality) {
             case 2: return "border-emerald-500/50 shadow-[0_0_8px_rgba(16,185,129,0.2)] bg-slate-950 hover:border-emerald-400"; // Bueno
-            case 3: return "border-blue-500/50 shadow-[0_0_8px_rgba(59,130,246,0.2)] bg-slate-950 hover:border-blue-400";   // Sobresaliente
-            case 4: return "border-purple-500/50 shadow-[0_0_8px_rgba(168,85,247,0.2)] bg-slate-950 hover:border-purple-400"; // Excelente
+            case 3: return "border-blue-500/50 shadow-[0_0_8px_rgba(59,130,246,0.2)] bg-slate-950 hover:border-blue-400";   // Notable
+            case 4: return "border-purple-500/50 shadow-[0_0_8px_rgba(168,85,247,0.2)] bg-slate-950 hover:border-purple-400"; // Sobresaliente
             case 5: return "border-amber-500/70 shadow-[0_0_10px_rgba(245,158,11,0.3)] bg-slate-950 hover:border-amber-400"; // Obra Maestra
             default: return "border-slate-700 bg-slate-950 hover:border-slate-500"; // Normal / Default
           }
@@ -1999,6 +2652,395 @@ function App() {
           </div>
         );
       })()}
+
+      {/* MODAL DE GESTIÓN DE MAPAS */}
+      {showManageModal && (
+        <div className="fixed inset-0 bg-black/85 backdrop-blur-md z-50 overflow-y-auto flex justify-center items-center p-4 animate-fadeIn">
+          <div className="bg-slate-950 border border-albion-gold/40 rounded-lg max-w-5xl w-full shadow-2xl flex flex-col relative my-8 max-h-[90vh]">
+            
+            {/* Cabecera */}
+            <div className="flex justify-between items-center px-6 py-4 border-b border-albion-border/60 bg-slate-950">
+              <h3 className="text-sm font-bold uppercase tracking-widest text-slate-300 flex items-center gap-2">
+                <span>⚙️</span> Panel de Gestión de Zonas y Mapas
+              </h3>
+              <button
+                onClick={() => {
+                  setShowManageModal(false);
+                  fetchRadar(false);
+                }}
+                className="text-slate-400 hover:text-slate-100 text-lg font-bold p-1 cursor-pointer"
+              >
+                ✕
+              </button>
+            </div>
+
+            {/* Cuerpo en dos columnas */}
+            <div className="p-6 grid grid-cols-1 lg:grid-cols-12 gap-6 overflow-y-auto">
+              
+              {/* Columna Izquierda: Añadir Nueva Zona */}
+              <div className="lg:col-span-4 bg-slate-900/40 border border-albion-border/40 p-4 rounded-lg flex flex-col gap-4">
+                <h4 className="text-xs font-bold text-albion-gold uppercase tracking-widest border-b border-albion-border/30 pb-2">
+                  ➕ Añadir Nuevo Mapa
+                </h4>
+                
+                <form onSubmit={handleAddZone} className="flex flex-col gap-3.5 relative">
+                  <div className="relative">
+                    <label className="text-[10px] text-slate-400 font-bold uppercase tracking-widest block mb-1.5">
+                      Nombre de la Zona
+                    </label>
+                    <input
+                      type="text"
+                      placeholder="Ej: Blackthorn Quarry..."
+                      value={newZoneName}
+                      onFocus={() => setShowAddSuggestions(true)}
+                      onBlur={() => setTimeout(() => setShowAddSuggestions(false), 200)}
+                      onChange={(e) => {
+                        setNewZoneName(e.target.value);
+                        setShowAddSuggestions(true);
+                      }}
+                      className="w-full bg-slate-950 border border-albion-border/80 focus:border-albion-gold text-xs text-slate-200 px-3 py-2 rounded outline-none transition-all placeholder-slate-700 font-semibold"
+                    />
+                    
+                    {/* Autocomplete Dropdown para Añadir */}
+                    {showAddSuggestions && (() => {
+                      const suggestions = SUGGESTED_WORLD_ZONES.filter(z => {
+                        const matchesText = !newZoneName.trim() || z.n.toLowerCase().includes(newZoneName.toLowerCase());
+                        const matchesTier = newZoneTier === "all" || z.t === parseInt(newZoneTier);
+                        const matchesBiome = newZoneBiome === "all" || z.b === newZoneBiome;
+                        const isNotAdded = !zonesList.some(curr => curr.n.toLowerCase() === z.n.toLowerCase());
+                        return matchesText && matchesTier && matchesBiome && isNotAdded;
+                      }).slice(0, 8);
+                      
+                      if (suggestions.length === 0) return null;
+                      
+                      return (
+                        <div className="absolute top-full left-0 right-0 mt-1 bg-slate-950 border border-albion-border rounded-md shadow-2xl z-50 divide-y divide-albion-border/20 max-h-[220px] overflow-y-auto">
+                          {suggestions.map((s) => (
+                            <button
+                              key={s.n}
+                              type="button"
+                              onMouseDown={() => {
+                                setNewZoneName(s.n);
+                                setShowAddSuggestions(false);
+                              }}
+                              className="w-full text-left px-3 py-2 hover:bg-slate-900 text-xs font-semibold text-slate-300 hover:text-albion-gold flex justify-between cursor-pointer"
+                            >
+                              <span>{s.n}</span>
+                              <span className="text-[10px] text-slate-500 font-mono">T{s.t} {s.b === 'black' ? 'Negra' : s.b === 'red' ? 'Roja' : s.b}</span>
+                            </button>
+                          ))}
+                        </div>
+                      );
+                    })()}
+                  </div>
+
+                  <div>
+                    <label className="text-[10px] text-slate-400 font-bold uppercase tracking-widest block mb-1.5">
+                      Filtrar por Tier
+                    </label>
+                    <select
+                      value={newZoneTier}
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        setNewZoneTier(val === "all" ? "all" : parseInt(val));
+                      }}
+                      className="w-full bg-slate-950 border border-albion-border/80 text-xs text-slate-200 px-3 py-2 rounded outline-none focus:border-albion-gold font-semibold"
+                    >
+                      <option value="all">Todos los Tiers</option>
+                      <option value="3">Tier 3 (T3)</option>
+                      <option value="4">Tier 4 (T4)</option>
+                      <option value="5">Tier 5 (T5)</option>
+                      <option value="6">Tier 6 (T6)</option>
+                      <option value="7">Tier 7 (T7)</option>
+                      <option value="8">Tier 8 (T8)</option>
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="text-[10px] text-slate-400 font-bold uppercase tracking-widest block mb-1.5">
+                      Filtrar por Bioma
+                    </label>
+                    <select
+                      value={newZoneBiome}
+                      onChange={(e) => setNewZoneBiome(e.target.value)}
+                      className="w-full bg-slate-950 border border-albion-border/80 text-xs text-slate-200 px-3 py-2 rounded outline-none focus:border-albion-gold font-semibold"
+                    >
+                      <option value="all">Todos los Biomas</option>
+                      <option value="black">Zona Negra (Black Zone)</option>
+                      <option value="red">Zona Roja (Red Zone)</option>
+                      <option value="yellow">Zona Amarilla (Yellow Zone)</option>
+                      <option value="blue">Zona Azul (Blue Zone)</option>
+                    </select>
+                  </div>
+
+                  <button
+                    type="submit"
+                    className="w-full py-2.5 bg-gradient-to-r from-albion-gold to-amber-600 hover:from-amber-500 hover:to-amber-600 text-slate-950 font-bold text-xs uppercase tracking-wider rounded shadow-md active:translate-y-px transition cursor-pointer"
+                  >
+                    Guardar Mapa
+                  </button>
+                </form>
+              </div>
+
+              {/* Columna Derecha: Búsqueda, Filtros y Lista */}
+              <div className="lg:col-span-8 flex flex-col gap-4">
+                
+                {/* Controles de Búsqueda de Gestión */}
+                <div className="flex flex-col sm:flex-row gap-3 items-center justify-between">
+                  <div className="relative w-full sm:max-w-xs">
+                    <input
+                      type="text"
+                      placeholder="Filtrar mapas gestionados..."
+                      value={manageSearchQuery}
+                      onChange={(e) => setManageSearchQuery(e.target.value)}
+                      className="w-full bg-slate-900 border border-albion-border/60 text-xs text-slate-200 pl-8 pr-4 py-2 rounded outline-none focus:border-albion-gold font-semibold"
+                    />
+                    <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-500 text-xs">🔍</span>
+                  </div>
+
+                  {/* Tabs Modal */}
+                  <div className="flex bg-slate-900 p-1 rounded border border-albion-border/60">
+                    {[
+                      { id: "all", label: "Todos" },
+                      { id: "favs", label: "Favoritos ⭐" },
+                      { id: "recents", label: "Recientes 🕒" }
+                    ].map(tab => (
+                      <button
+                        key={tab.id}
+                        type="button"
+                        onClick={() => setManageTab(tab.id)}
+                        className={`px-3 py-1 text-[10px] font-bold uppercase tracking-wider rounded transition cursor-pointer ${
+                          manageTab === tab.id
+                            ? "bg-amber-500/10 text-albion-gold border border-albion-gold/30"
+                            : "text-slate-400 hover:text-slate-200"
+                        }`}
+                      >
+                        {tab.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Listado con scroll */}
+                <div className="bg-slate-950/80 border border-albion-border/40 rounded-lg overflow-hidden flex-1 overflow-y-auto max-h-[350px]">
+                  <table className="w-full text-left border-collapse text-xs">
+                    <thead>
+                      <tr className="bg-slate-900 border-b border-albion-border/60 text-[10px] text-slate-400 uppercase font-bold tracking-wider">
+                        <th className="py-2.5 px-3">Mapa / Info</th>
+                        <th className="py-2.5 px-3">Atributos</th>
+                        <th className="py-2.5 px-3">Etiquetas</th>
+                        <th className="py-2.5 px-3 text-right">Acciones</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-albion-border/10 font-medium">
+                      {(() => {
+                        const filtered = zonesList.filter(z => {
+                          const matchSearch = z.n.toLowerCase().includes(manageSearchQuery.toLowerCase());
+                          if (manageTab === "favs") return matchSearch && z.fav;
+                          if (manageTab === "recents") return matchSearch && recentZonesFromDb.includes(z.n);
+                          return matchSearch;
+                        });
+
+                        if (filtered.length === 0) {
+                          return (
+                            <tr>
+                              <td colSpan="4" className="py-8 text-center text-slate-500 italic">
+                                No se encontraron mapas en esta sección.
+                              </td>
+                            </tr>
+                          );
+                        }
+
+                        return filtered.map((zone) => {
+                          const isEditing = editingZoneId === zone.id;
+                          const biomeColor = zone.b === 'black' ? 'text-purple-400' : zone.b === 'red' ? 'text-red-400' : 'text-slate-300';
+                          
+                          if (isEditing) {
+                            return (
+                              <tr key={zone.id} className="bg-amber-500/5">
+                                <td className="py-3 px-3" colSpan="2">
+                                  <div className="flex flex-col gap-2">
+                                    <div className="flex gap-2">
+                                      <input
+                                        type="text"
+                                        value={editingZoneData.n || ""}
+                                        onChange={(e) => setEditingZoneData({ ...editingZoneData, n: e.target.value })}
+                                        className="bg-slate-950 border border-albion-border text-xs px-2 py-1 rounded text-slate-200 focus:border-albion-gold outline-none w-full font-semibold"
+                                        placeholder="Nombre del mapa"
+                                      />
+                                      <select
+                                        value={editingZoneData.t || 5}
+                                        onChange={(e) => setEditingZoneData({ ...editingZoneData, t: parseInt(e.target.value) })}
+                                        className="bg-slate-950 border border-albion-border text-xs px-2 py-1 rounded text-slate-200 outline-none w-20"
+                                      >
+                                        {[3,4,5,6,7,8].map(t => <option key={t} value={t}>T{t}</option>)}
+                                      </select>
+                                    </div>
+                                    <div className="flex gap-2">
+                                      <select
+                                        value={editingZoneData.b || "black"}
+                                        onChange={(e) => setEditingZoneData({ ...editingZoneData, b: e.target.value })}
+                                        className="bg-slate-950 border border-albion-border text-xs px-2 py-1 rounded text-slate-200 outline-none w-full"
+                                      >
+                                        <option value="black">Zona Negra</option>
+                                        <option value="red">Zona Roja</option>
+                                        <option value="yellow">Zona Amarilla</option>
+                                        <option value="blue">Zona Azul</option>
+                                      </select>
+                                      <select
+                                        value={editingZoneData.p || 0}
+                                        onChange={(e) => setEditingZoneData({ ...editingZoneData, p: parseInt(e.target.value) })}
+                                        className="bg-slate-950 border border-albion-border text-xs px-2 py-1 rounded text-slate-200 outline-none w-full font-bold"
+                                      >
+                                        <option value="0">Normal</option>
+                                        <option value="1">⭐ Prioridad Alta</option>
+                                      </select>
+                                    </div>
+                                  </div>
+                                </td>
+                                <td className="py-3 px-3">
+                                  <input
+                                    type="text"
+                                    value={Array.isArray(editingZoneData.tags) ? editingZoneData.tags.join(", ") : editingZoneData.tags || ""}
+                                    onChange={(e) => setEditingZoneData({ ...editingZoneData, tags: e.target.value })}
+                                    className="bg-slate-950 border border-albion-border text-[11px] px-2 py-1 rounded text-slate-300 focus:border-albion-gold outline-none w-full"
+                                    placeholder="Etiquetas (separadas por coma)"
+                                  />
+                                </td>
+                                <td className="py-3 px-3 text-right">
+                                  <div className="flex justify-end gap-1.5">
+                                    <button
+                                      type="button"
+                                      onClick={() => handleUpdateZoneInline(zone.id)}
+                                      className="px-2 py-1 bg-emerald-500/25 hover:bg-emerald-500 border border-emerald-500 text-emerald-300 hover:text-slate-950 font-bold rounded text-[10px] cursor-pointer uppercase transition"
+                                    >
+                                      Guardar
+                                    </button>
+                                    <button
+                                      type="button"
+                                      onClick={() => setEditingZoneId(null)}
+                                      className="px-2 py-1 bg-slate-900 border border-slate-700 text-slate-300 rounded text-[10px] cursor-pointer uppercase hover:bg-slate-800 transition"
+                                    >
+                                      Cancelar
+                                    </button>
+                                  </div>
+                                </td>
+                              </tr>
+                            );
+                          }
+
+                          return (
+                            <tr key={zone.id} className="hover:bg-slate-900/30 transition-colors">
+                              <td className="py-2.5 px-3">
+                                <div className="flex items-center gap-2">
+                                  <span className="text-[10px] px-1 py-0.2 bg-slate-900 border border-slate-700 text-slate-400 font-bold font-mono rounded">
+                                    T{zone.t}
+                                  </span>
+                                  <span className="font-bold text-slate-200">{zone.n}</span>
+                                  {recentZonesFromDb.includes(zone.n) && (
+                                    <span className="text-[10px]" title="Reciente">🕒</span>
+                                  )}
+                                  {zone.fav && (
+                                    <span className="text-amber-500 text-[10px]" title="Favorito">⭐</span>
+                                  )}
+                                </div>
+                              </td>
+                              <td className="py-2.5 px-3">
+                                <div className="flex flex-col gap-0.5">
+                                  <span className={`text-[10px] font-bold uppercase tracking-wider ${biomeColor}`}>
+                                    {zone.b === 'black' ? 'Negra' : zone.b === 'red' ? 'Roja' : zone.b}
+                                  </span>
+                                  {zone.p === 1 && (
+                                    <span className="text-[8px] font-bold text-red-400 bg-red-400/10 px-1 rounded uppercase tracking-wider w-max scale-90 -ml-1">
+                                      Alta Prioridad
+                                    </span>
+                                  )}
+                                </div>
+                              </td>
+                              <td className="py-2.5 px-3">
+                                <div className="flex flex-wrap gap-1">
+                                  {zone.tags && zone.tags.length > 0 ? (
+                                    zone.tags.map(t => (
+                                      <span key={t} className="bg-slate-900 text-slate-400 text-[9px] px-1.5 py-0.2 rounded border border-slate-800">
+                                        {t}
+                                      </span>
+                                    ))
+                                  ) : (
+                                    <span className="text-slate-500 text-[10px] italic">-</span>
+                                  )}
+                                </div>
+                              </td>
+                              <td className="py-2.5 px-3 text-right">
+                                <div className="flex justify-end gap-1">
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      setEditingZoneId(zone.id);
+                                      setEditingZoneData({
+                                        ...zone,
+                                        tags: Array.isArray(zone.tags) ? zone.tags.join(", ") : zone.tags
+                                      });
+                                    }}
+                                    className="p-1.5 bg-slate-900 border border-slate-700 hover:border-slate-500 text-slate-400 hover:text-slate-200 rounded transition cursor-pointer"
+                                    title="Editar"
+                                  >
+                                    ✏️
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => handleToggleFavorite(zone)}
+                                    className="p-1.5 bg-slate-900 border border-slate-700 hover:border-amber-500/50 text-slate-400 hover:text-amber-400 rounded transition cursor-pointer"
+                                    title={zone.fav ? "Quitar Favorito" : "Marcar Favorito"}
+                                  >
+                                    {zone.fav ? "★" : "☆"}
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => handleTogglePriority(zone)}
+                                    className={`p-1.5 bg-slate-900 border text-xs rounded transition cursor-pointer ${zone.p === 1 ? 'border-red-500/50 text-red-400 hover:text-red-300' : 'border-slate-700 text-slate-400 hover:text-red-400'}`}
+                                    title="Alternar Prioridad"
+                                  >
+                                    🚨
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => handleDeleteZone(zone.id)}
+                                    className="p-1.5 bg-slate-900 border border-slate-700 hover:border-red-650 hover:text-red-500 rounded transition cursor-pointer"
+                                    title="Eliminar Mapa"
+                                  >
+                                    🗑️
+                                  </button>
+                                </div>
+                              </td>
+                            </tr>
+                          );
+                        });
+                      })()}
+                    </tbody>
+                  </table>
+                </div>
+
+              </div>
+
+            </div>
+
+            {/* Pie del modal */}
+            <div className="flex justify-end items-center gap-3 px-6 py-4 border-t border-albion-border/40 bg-slate-950 rounded-b-lg">
+              <button
+                type="button"
+                onClick={() => {
+                  setShowManageModal(false);
+                  fetchRadar(false);
+                }}
+                className="px-5 py-2 bg-slate-900 hover:bg-slate-850 border border-slate-750 hover:border-slate-650 text-slate-300 text-xs font-bold uppercase tracking-wider rounded transition cursor-pointer"
+              >
+                Cerrar Panel
+              </button>
+            </div>
+
+          </div>
+        </div>
+      )}
     </div>
   );
 }

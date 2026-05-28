@@ -7,6 +7,7 @@ import unicodedata
 import difflib
 
 ITEMS_URL = "https://raw.githubusercontent.com/ao-data/ao-bin-dumps/master/formatted/items.json"
+ITEMS_FALLBACK_URL = "https://cdn.jsdelivr.net/gh/ao-data/ao-bin-dumps@master/formatted/items.json"
 
 def get_cache_path():
     if sys.platform == 'win32':
@@ -18,11 +19,20 @@ def get_cache_path():
     try:
         os.makedirs(dir_path, exist_ok=True)
     except Exception:
-        return "items_cache.json"
+        # Fallback absolute path in user home directory which is always writable
+        home_dir = os.path.expanduser('~')
+        dir_path = os.path.join(home_dir, '.albionmarket')
+        try:
+            os.makedirs(dir_path, exist_ok=True)
+        except Exception:
+            return os.path.join(home_dir, "items_cache.json")
         
     return os.path.join(dir_path, "items_cache.json")
 
 CACHE_FILE = get_cache_path()
+CACHE_DIR = os.path.dirname(CACHE_FILE)
+ZONES_FILE = os.path.join(CACHE_DIR, "zones_db.json")
+RECENT_ZONES_FILE = os.path.join(CACHE_DIR, "recent_zones.json")
 
 def normalize(text):
     if not text:
@@ -31,6 +41,12 @@ def normalize(text):
     nfkd_form = unicodedata.normalize('NFKD', text)
     text = "".join([c for c in nfkd_form if not unicodedata.combining(c)])
     return " ".join(text.split())
+
+def is_blacklisted(zone_name):
+    if not zone_name:
+        return False
+    blacklist = ["bridgewatch", "martlock", "thetford", "lymhurst", "fort sterling", "caerleon", "brecilien"]
+    return normalize(zone_name) in blacklist
 
 def calculate_score(query, target):
     q = normalize(query)
@@ -59,7 +75,7 @@ def calculate_score(query, target):
         for tw in t_words:
             if qw == tw:
                 score = 100.0
-            elif qw in tw or tw in qw:
+            elif (qw in tw or tw in qw) and len(qw) > 1 and len(tw) > 1:
                 intersection_len = min(len(qw), len(tw))
                 union_len = max(len(qw), len(tw))
                 score = 60.0 + (intersection_len / union_len) * 40.0
@@ -112,7 +128,7 @@ def clean_base_name(name):
 
 class AlbionAPI:
     def __init__(self):
-        self.window = None
+        self._window = None
         self.items = []
         self.item_map = {}
         self.item_names = []
@@ -126,9 +142,12 @@ class AlbionAPI:
             "5": ("Accesorios", ["Capa", "Bolsa"]),
             "8": ("Artefactos", ["Runa", "Alma", "Reliquia"])
         }
+        self.zones = []
+        self.recent_zones = []
+        self.loadZonesDatabase()
 
     def set_window(self, window):
-        self.window = window
+        self._window = window
 
     def getItemImageBase64(self, item_id):
         if item_id in self.image_cache:
@@ -156,7 +175,7 @@ class AlbionAPI:
                 base64_image = base64_image.split(",", 1)[1]
             image_data = base64.b64decode(base64_image)
             
-            win = self.window or (webview.windows[0] if webview.windows else None)
+            win = self._window or (webview.windows[0] if webview.windows else None)
             if win:
                 save_path = win.create_file_dialog(
                     webview.SAVE_DIALOG,
@@ -192,7 +211,20 @@ class AlbionAPI:
                     print(f"Error al leer caché, descargando de nuevo: {e}")
             
             # Descargar si no está en caché o falló la lectura
-            response = requests.get(ITEMS_URL, timeout=25)
+            response = None
+            try:
+                response = requests.get(ITEMS_URL, timeout=45)
+                response.raise_for_status()
+            except Exception as e:
+                print(f"Error al descargar de la URL principal ({e}). Reintentando con SSL relajado...")
+                try:
+                    import urllib3
+                    urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
+                    response = requests.get(ITEMS_URL, timeout=45, verify=False)
+                    response.raise_for_status()
+                except Exception as e_ssl:
+                    raise Exception(f"No se pudo descargar la base de datos de ítems. Principal: {e}. SSL-relajado: {e_ssl}")
+            
             self.items = response.json()
             
             # Guardar en caché
@@ -209,27 +241,8 @@ class AlbionAPI:
             return None
         uname = unique_name.upper()
         
-        resource_keywords = [
-            "_CLOTH", "_LEATHER", "_METALBAR", "_PLANKS", "_STONEBLOCK",
-            "_FIBER", "_ORE", "_HIDE", "_WOOD", "_ROCK"
-        ]
-        if any(kw in uname for kw in resource_keywords):
-            return "6"  # Materiales
-            
-        if "_FOOD" in uname:
-            return "71"  # Comida
-        if "_POTION" in uname:
-            return "72"  # Pociones
-        if "_SKILLBOOK" in uname or "_JOURNAL" in uname:
-            return "73"  # Tomos
-        if any(kw in uname for kw in ["_MAP", "_HELLGATE", "_BAIT", "_CREST", "QUESTITEM_EXP_TOKEN"]):
-            return "74"  # Otros Consumibles
-            
-        if uname.endswith("_RUNE") or uname.endswith("_SOUL") or uname.endswith("_RELIC"):
-            return "8"  # Artefactos (Runas, Almas, Reliquias)
-            
-        # Exclude artifacts and tools from equipment categories
-        if "_ARTEFACT_" in uname or "_TOOL_" in uname:
+        # Exclude artifacts, tools, and vanity/cosmetic items from equipment categories
+        if "_ARTEFACT_" in uname or "_TOOL_" in uname or uname.startswith("UNIQUE_"):
             return None
             
         if "_CAPE" in uname or "_BAG" in uname:
@@ -251,6 +264,25 @@ class AlbionAPI:
         ]
         if any(kw in uname for kw in weapon_keywords):
             return "1"  # Armas
+            
+        resource_keywords = [
+            "_CLOTH", "_LEATHER", "_METALBAR", "_PLANKS", "_STONEBLOCK",
+            "_FIBER", "_ORE", "_HIDE", "_WOOD", "_ROCK"
+        ]
+        if any(kw in uname for kw in resource_keywords):
+            return "6"  # Materiales
+            
+        if "_FOOD" in uname:
+            return "71"  # Comida
+        if "_POTION" in uname:
+            return "72"  # Pociones
+        if "_SKILLBOOK" in uname or "_JOURNAL" in uname:
+            return "73"  # Tomos
+        if any(kw in uname for kw in ["_MAP", "_HELLGATE", "_BAIT", "_CREST", "QUESTITEM_EXP_TOKEN"]):
+            return "74"  # Otros Consumibles
+            
+        if uname.endswith("_RUNE") or uname.endswith("_SOUL") or uname.endswith("_RELIC"):
+            return "8"  # Artefactos (Runas, Almas, Reliquias)
             
         return None
 
@@ -314,18 +346,32 @@ class AlbionAPI:
                     
         self.item_names = list(seen_display_names)
 
-    def searchItems(self, category_id, query):
+    def searchItems(self, category_id, query, sub_category=""):
         if not self.items:
             return []
             
         # Filter items belonging to the selected category
         category_items = [x for x in self.search_index if x["category"] == category_id]
         
+        # Filter by sub-category (Plate, Leather, Cloth)
+        if sub_category:
+            sub = sub_category.upper()
+            if sub == "PLACA":
+                category_items = [x for x in category_items if "_PLATE_" in x["id"]]
+            elif sub == "CUERO":
+                category_items = [x for x in category_items if "_LEATHER_" in x["id"]]
+            elif sub == "TELA":
+                category_items = [x for x in category_items if "_CLOTH_" in x["id"]]
+            elif sub == "CAPA":
+                category_items = [x for x in category_items if "_CAPE" in x["id"]]
+            elif sub == "BOLSA":
+                category_items = [x for x in category_items if "_BAG" in x["id"]]
+        
         query = query.strip()
         if not query:
-            # Return first 10 items of the category sorted alphabetically
+            # Return first 50 items of the category sorted alphabetically
             category_items.sort(key=lambda x: x["display_name"])
-            return [{"display_name": x["display_name"], "id": x["id"]} for x in category_items[:10]]
+            return [{"display_name": x["display_name"], "id": x["id"]} for x in category_items[:50]]
             
         scored = []
         for item in category_items:
@@ -340,7 +386,7 @@ class AlbionAPI:
         # Sort by score descending, then by display name alphabetically
         scored.sort(key=lambda x: (-x[0], x[1]))
         
-        return [{"display_name": x[1], "id": x[2]} for x in scored[:10]]
+        return [{"display_name": x[1], "id": x[2]} for x in scored[:50]]
 
     def getPrices(self, selected_name, tier_choice, enc_choice, quality_choice, server):
         posibles_ids = []
@@ -536,6 +582,276 @@ class AlbionAPI:
         tiers.sort(key=lambda x: int(x["tier"]))
         return tiers
 
+    def loadZonesDatabase(self):
+        try:
+            # 1. Load recent zones
+            recent_loaded = False
+            if os.path.exists(RECENT_ZONES_FILE):
+                try:
+                    with open(RECENT_ZONES_FILE, "r", encoding="utf-8") as f:
+                        self.recent_zones = json.load(f)
+                        recent_loaded = True
+                except Exception as e:
+                    print(f"Error loading recent zones: {e}")
+            if not recent_loaded:
+                self.recent_zones = []
+                self._save_recent_zones()
+
+            # 2. Load zones database
+            if os.path.exists(ZONES_FILE):
+                try:
+                    with open(ZONES_FILE, "r", encoding="utf-8") as f:
+                        self.zones = json.load(f)
+                    
+                    # If empty, populate with default test zones
+                    if not self.zones:
+                        try:
+                            from test_zones_data import get_default_test_zones
+                            self.zones = get_default_test_zones()
+                            self._save_zones()
+                        except ImportError:
+                            pass
+                    else:
+                        # Ensure we filter out any blacklisted cities that might have snuck in
+                        self.zones = [z for z in self.zones if not is_blacklisted(z.get("n"))]
+                    return {"success": True, "loaded": True}
+                except Exception as e:
+                    print(f"Error loading zones database: {e}")
+
+            # Populate with default test zones by default
+            try:
+                from test_zones_data import get_default_test_zones
+                self.zones = get_default_test_zones()
+            except ImportError:
+                self.zones = []
+            self._save_zones()
+            
+            return {"success": True, "loaded": False}
+        except Exception as e:
+            return {"success": False, "error": str(e)}
+
+    def _update_zones_from_api_bg(self):
+        try:
+            url = "https://gameinfo.albiononline.com/api/gameinfo/worldmap/zones"
+            headers = {
+                "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+            }
+            response = requests.get(url, headers=headers, timeout=15)
+            if response.status_code == 200:
+                api_zones = response.json()
+                if isinstance(api_zones, list):
+                    zones_dict = {z["n"].lower(): z for z in self.zones}
+                    updated = False
+                    for item in api_zones:
+                        name = item.get("name") or item.get("n") or item.get("DisplayName")
+                        if not name:
+                            continue
+                        if is_blacklisted(name):
+                            continue
+                        
+                        lower_name = name.lower()
+                        tier = item.get("tier") or item.get("t") or 5
+                        biome = item.get("biome") or item.get("b") or "black"
+                        zone_id = item.get("id") or lower_name.replace(" ", "_")
+                        
+                        if lower_name not in zones_dict:
+                            zones_dict[lower_name] = {
+                                "id": zone_id,
+                                "n": name,
+                                "t": int(tier) if str(tier).isdigit() else 5,
+                                "b": biome,
+                                "fav": False,
+                                "p": 0,
+                                "tags": []
+                            }
+                            updated = True
+                    
+                    if updated:
+                        self.zones = list(zones_dict.values())
+                        self._save_zones()
+                        print("Zones database successfully updated from API.")
+        except Exception as e:
+            print(f"Background zones update failed: {e}")
+
+
+
+    def _save_zones(self):
+        try:
+            with open(ZONES_FILE, "w", encoding="utf-8") as f:
+                json.dump(self.zones, f, ensure_ascii=False, indent=2)
+            return True
+        except Exception as e:
+            print(f"Error saving zones database: {e}")
+            return False
+
+    def _save_recent_zones(self):
+        try:
+            with open(RECENT_ZONES_FILE, "w", encoding="utf-8") as f:
+                json.dump(self.recent_zones, f, ensure_ascii=False, indent=2)
+            return True
+        except Exception as e:
+            print(f"Error saving recent zones: {e}")
+            return False
+
+    def searchZones(self, query):
+        query = query.strip()
+        scored_zones = []
+        for z in self.zones:
+            if is_blacklisted(z["n"]):
+                continue
+            if not query:
+                score = 1.0
+            else:
+                score = calculate_score(query, z["n"])
+            
+            is_match = (score >= 30.0) if query else (score > 0)
+            if is_match:
+                is_recent = z["n"] in self.recent_zones
+                recent_index = self.recent_zones.index(z["n"]) if is_recent else 999
+                is_fav = z.get("fav", False)
+                priority = z.get("p", 0)
+                scored_zones.append((
+                    is_recent,
+                    recent_index,
+                    score,
+                    is_fav,
+                    priority,
+                    z
+                ))
+        scored_zones.sort(key=lambda x: (
+            -1 if x[0] else 0, # -is_recent
+            x[1],              # recent_index (0, 1, 2... or 999)
+            -x[2],             # -score
+            -1 if x[3] else 0, # -is_fav
+            -x[4],             # -priority
+            -x[5]["t"],        # -tier
+            x[5]["n"].lower()  # name asc
+        ))
+        results = []
+        for item in scored_zones:
+            z = item[5]
+            results.append({
+                "id": z["id"],
+                "n": z["n"],
+                "t": z["t"],
+                "b": z["b"],
+                "fav": z.get("fav", False),
+                "p": z.get("p", 0),
+                "tags": z.get("tags", []),
+                "recent": item[0]
+            })
+        if query:
+            return results[:15]
+        else:
+            return results
+
+    def addZone(self, zone_data):
+        try:
+            name = zone_data.get("n", "").strip()
+            if not name:
+                return {"success": False, "error": "El nombre de la zona es obligatorio."}
+            if is_blacklisted(name):
+                return {"success": False, "error": "No puedes agregar las ciudades principales de Albion."}
+            for z in self.zones:
+                if z["n"].lower() == name.lower():
+                    return {"success": False, "error": f"La zona '{name}' ya existe en la base de datos."}
+            tier = int(zone_data.get("t", 5))
+            biome = zone_data.get("b", "black").lower()
+            if biome not in ["black", "red", "yellow", "blue"]:
+                biome = "black"
+            new_zone = {
+                "id": name.lower().replace(" ", "_"),
+                "n": name,
+                "t": tier,
+                "b": biome,
+                "fav": bool(zone_data.get("fav", False)),
+                "p": int(zone_data.get("p", 0)),
+                "tags": zone_data.get("tags", [])
+            }
+            self.zones.append(new_zone)
+            self._save_zones()
+            return {"success": True, "zone": new_zone}
+        except Exception as e:
+            return {"success": False, "error": str(e)}
+
+    def updateZone(self, zone_id, updated_data):
+        try:
+            target_zone = None
+            for z in self.zones:
+                if z["id"] == zone_id:
+                    target_zone = z
+                    break
+            if not target_zone:
+                return {"success": False, "error": "Zona no encontrada."}
+            new_name = updated_data.get("n", "").strip()
+            if new_name and new_name.lower() != target_zone["n"].lower():
+                if is_blacklisted(new_name):
+                    return {"success": False, "error": "No puedes usar nombres de las ciudades principales de Albion."}
+                for z in self.zones:
+                    if z["id"] != zone_id and z["n"].lower() == new_name.lower():
+                        return {"success": False, "error": f"Ya existe otra zona con el nombre '{new_name}'."}
+                old_name = target_zone["n"]
+                target_zone["n"] = new_name
+                target_zone["id"] = new_name.lower().replace(" ", "_")
+                for idx, r_name in enumerate(self.recent_zones):
+                    if r_name.lower() == old_name.lower():
+                        self.recent_zones[idx] = new_name
+                        self._save_recent_zones()
+                        break
+            if "t" in updated_data:
+                target_zone["t"] = int(updated_data["t"])
+            if "b" in updated_data:
+                biome = updated_data["b"].lower()
+                if biome in ["black", "red", "yellow", "blue"]:
+                    target_zone["b"] = biome
+            if "fav" in updated_data:
+                target_zone["fav"] = bool(updated_data["fav"])
+            if "p" in updated_data:
+                target_zone["p"] = int(updated_data["p"])
+            if "tags" in updated_data:
+                target_zone["tags"] = updated_data["tags"]
+            self._save_zones()
+            return {"success": True, "zone": target_zone}
+        except Exception as e:
+            return {"success": False, "error": str(e)}
+
+    def deleteZone(self, zone_id):
+        try:
+            target_zone = None
+            for z in self.zones:
+                if z["id"] == zone_id:
+                    target_zone = z
+                    break
+            if not target_zone:
+                return {"success": False, "error": "Zona no encontrada."}
+            self.zones.remove(target_zone)
+            self._save_zones()
+            if target_zone["n"] in self.recent_zones:
+                self.recent_zones.remove(target_zone["n"])
+                self._save_recent_zones()
+            return {"success": True}
+        except Exception as e:
+            return {"success": False, "error": str(e)}
+
+    def getRecentZones(self):
+        return self.recent_zones
+
+    def addRecentZone(self, zone_name):
+        try:
+            zone_name = zone_name.strip()
+            if not zone_name:
+                return {"success": False, "error": "Nombre de zona vacío."}
+            if is_blacklisted(zone_name):
+                return {"success": False, "error": "No se pueden registrar las ciudades principales como recientes."}
+            if zone_name in self.recent_zones:
+                self.recent_zones.remove(zone_name)
+            self.recent_zones.insert(0, zone_name)
+            self.recent_zones = self.recent_zones[:10]
+            self._save_recent_zones()
+            return {"success": True, "recent_zones": self.recent_zones}
+        except Exception as e:
+            return {"success": False, "error": str(e)}
+
     def getRiskRadar(self, server):
         server_urls = {
             "west": "gameinfo.albiononline.com",
@@ -546,32 +862,14 @@ class AlbionAPI:
         url = f"https://{domain}/api/gameinfo/events?limit=50"
         
         popular_zones = [
-            {"name": "Redtree Enclave", "type": "Black Zone"},
-            {"name": "Creag Garr", "type": "Red Zone"},
-            {"name": "Runnelvein Bog", "type": "Red Zone"},
-            {"name": "Timberwood Dell", "type": "Black Zone"},
-            {"name": "Drownhole Fen", "type": "Black Zone"},
-            {"name": "Razorrock Ravine", "type": "Black Zone"},
-            {"name": "Mardu", "type": "Black Zone"},
-            {"name": "Gravemound Slope", "type": "Black Zone"},
-            {"name": "Saddleback Pass", "type": "Red Zone"},
-            {"name": "Whitecleave", "type": "Black Zone"},
-            {"name": "Sandstone Deep", "type": "Black Zone"},
-            {"name": "Blackthorn Quarry", "type": "Black Zone"},
-            {"name": "Wanderers Rest", "type": "Black Zone"},
-            {"name": "Slithervent Canyon", "type": "Black Zone"},
-            {"name": "Death-reach Gorge", "type": "Black Zone"},
-            {"name": "Highland Cross", "type": "Red Zone"},
-            {"name": "Swamp Cross", "type": "Red Zone"},
-            {"name": "Mountain Cross", "type": "Red Zone"},
-            {"name": "Steppe Cross", "type": "Red Zone"},
-            {"name": "Forest Cross", "type": "Red Zone"},
-            {"name": "Caerleon Outskirts", "type": "Red Zone"},
-            {"name": "Lymhurst Portal Area", "type": "Black Zone"},
-            {"name": "Fort Sterling Portal Area", "type": "Black Zone"},
-            {"name": "Thetford Portal Area", "type": "Black Zone"},
-            {"name": "Martlock Portal Area", "type": "Black Zone"},
-            {"name": "Bridgewatch Portal Area", "type": "Black Zone"}
+            {"name": z["n"], "type": f"{z['b'].capitalize()} Zone" if z["b"] else "Unknown Zone", "p": z.get("p", 0)}
+            for z in self.zones
+            if not (
+                "portal area" in z["n"].lower() or
+                z["n"].lower().endswith(" cross") or
+                z.get("b") in ["blue", "yellow"] or
+                is_blacklisted(z["n"])
+            )
         ]
         
         try:
@@ -589,6 +887,7 @@ class AlbionAPI:
                 zones_data[z["name"]] = {
                     "name": z["name"],
                     "type": z["type"],
+                    "p": z.get("p", 0),
                     "deaths": [],
                     "death_count": 0,
                     "avg_group_size": 0,
@@ -601,80 +900,81 @@ class AlbionAPI:
             
             total_kills = len(data)
             
-            for event in data:
-                event_id = event.get("EventId", 0)
-                if not event_id:
-                    continue
-                
-                zone_index = event_id % len(popular_zones)
-                assigned_zone = popular_zones[zone_index]["name"]
-                
-                victim = event.get("Victim", {}) or {}
-                victim_name = victim.get("Name", "Desconocido")
-                victim_guild = victim.get("GuildName") or "Sin Guild"
-                victim_alliance = victim.get("AllianceName") or ""
-                victim_ip = victim.get("AverageItemPower", 0)
-                fame = event.get("TotalVictimKillFame", 0)
-                timestamp = event.get("TimeStamp", "")
-                
-                killer = event.get("Killer", {}) or {}
-                killer_name = killer.get("Name", "Desconocido")
-                killer_guild = killer.get("GuildName") or "Sin Guild"
-                killer_alliance = killer.get("AllianceName") or ""
-                killer_ip = killer.get("AverageItemPower", 0)
-                
-                group_size = event.get("groupMemberCount", 1)
-                
-                inventory_items = []
-                inventory_raw = victim.get("Inventory", []) or []
-                for item in inventory_raw:
-                    if item:
-                        item_id = item.get("Type", "")
-                        display_name = self.id_name_map.get(item_id, item_id)
-                        count = item.get("Count", 1)
-                        quality = item.get("Quality", 1)
-                        inventory_items.append({
-                            "id": item_id,
-                            "name": display_name,
-                            "count": count,
-                            "quality": quality
-                        })
-                
-                equipment_items = []
-                equipment_raw = victim.get("Equipment", {}) or {}
-                for slot, item in equipment_raw.items():
-                    if item:
-                        item_id = item.get("Type", "")
-                        display_name = self.id_name_map.get(item_id, item_id)
-                        count = item.get("Count", 1)
-                        quality = item.get("Quality", 1)
-                        equipment_items.append({
-                            "slot": slot,
-                            "id": item_id,
-                            "name": display_name,
-                            "count": count,
-                            "quality": quality
-                        })
-                
-                death_detail = {
-                    "event_id": event_id,
-                    "victim_name": victim_name,
-                    "victim_guild": victim_guild,
-                    "victim_alliance": victim_alliance,
-                    "victim_ip": round(victim_ip, 1),
-                    "killer_name": killer_name,
-                    "killer_guild": killer_guild,
-                    "killer_alliance": killer_alliance,
-                    "killer_ip": round(killer_ip, 1),
-                    "group_size": group_size,
-                    "fame": fame,
-                    "timestamp": timestamp,
-                    "inventory": inventory_items,
-                    "equipment": equipment_items
-                }
-                
-                zones_data[assigned_zone]["deaths"].append(death_detail)
-                zones_data[assigned_zone]["death_count"] += 1
+            if len(popular_zones) > 0:
+                for event in data:
+                    event_id = event.get("EventId", 0)
+                    if not event_id:
+                        continue
+                    
+                    zone_index = event_id % len(popular_zones)
+                    assigned_zone = popular_zones[zone_index]["name"]
+                    
+                    victim = event.get("Victim", {}) or {}
+                    victim_name = victim.get("Name", "Desconocido")
+                    victim_guild = victim.get("GuildName") or "Sin Guild"
+                    victim_alliance = victim.get("AllianceName") or ""
+                    victim_ip = victim.get("AverageItemPower", 0)
+                    fame = event.get("TotalVictimKillFame", 0)
+                    timestamp = event.get("TimeStamp", "")
+                    
+                    killer = event.get("Killer", {}) or {}
+                    killer_name = killer.get("Name", "Desconocido")
+                    killer_guild = killer.get("GuildName") or "Sin Guild"
+                    killer_alliance = killer.get("AllianceName") or ""
+                    killer_ip = killer.get("AverageItemPower", 0)
+                    
+                    group_size = event.get("groupMemberCount", 1)
+                    
+                    inventory_items = []
+                    inventory_raw = victim.get("Inventory", []) or []
+                    for item in inventory_raw:
+                        if item:
+                            item_id = item.get("Type", "")
+                            display_name = self.id_name_map.get(item_id, item_id)
+                            count = item.get("Count", 1)
+                            quality = item.get("Quality", 1)
+                            inventory_items.append({
+                                "id": item_id,
+                                "name": display_name,
+                                "count": count,
+                                "quality": quality
+                            })
+                    
+                    equipment_items = []
+                    equipment_raw = victim.get("Equipment", {}) or {}
+                    for slot, item in equipment_raw.items():
+                        if item:
+                            item_id = item.get("Type", "")
+                            display_name = self.id_name_map.get(item_id, item_id)
+                            count = item.get("Count", 1)
+                            quality = item.get("Quality", 1)
+                            equipment_items.append({
+                                "slot": slot,
+                                "id": item_id,
+                                "name": display_name,
+                                "count": count,
+                                "quality": quality
+                            })
+                    
+                    death_detail = {
+                        "event_id": event_id,
+                        "victim_name": victim_name,
+                        "victim_guild": victim_guild,
+                        "victim_alliance": victim_alliance,
+                        "victim_ip": round(victim_ip, 1),
+                        "killer_name": killer_name,
+                        "killer_guild": killer_guild,
+                        "killer_alliance": killer_alliance,
+                        "killer_ip": round(killer_ip, 1),
+                        "group_size": group_size,
+                        "fame": fame,
+                        "timestamp": timestamp,
+                        "inventory": inventory_items,
+                        "equipment": equipment_items
+                    }
+                    
+                    zones_data[assigned_zone]["deaths"].append(death_detail)
+                    zones_data[assigned_zone]["death_count"] += 1
             
             for name, zdata in zones_data.items():
                 deaths = zdata["deaths"]
@@ -718,9 +1018,16 @@ class AlbionAPI:
                     zdata["survival_farming"] = 99
                     zdata["survival_transport"] = 96
             
-            sorted_zones = list(zones_data.values())
+            # Filter out zones with 0 deaths to keep only active PvP zones
+            sorted_zones = [z for z in zones_data.values() if z["death_count"] > 0]
+            
             risk_weights = {"red": 4, "orange": 3, "yellow": 2, "green": 1}
-            sorted_zones.sort(key=lambda x: (-risk_weights[x["risk_level"]], -x["death_count"], x["name"]))
+            sorted_zones.sort(key=lambda x: (
+                -x.get("p", 0),
+                -risk_weights[x["risk_level"]],
+                -x["death_count"],
+                x["name"]
+            ))
             
             return {
                 "success": True,
