@@ -56,6 +56,115 @@ const foodPreviewIds = {
   "MEAL_PIE": "T7_MEAL_PIE"
 };
 
+const CATEGORIES_TREE = {
+  "Todos": [],
+  "EQUIPO DE COMBATE": [
+    "Armadura de Cabeza (Tela)",
+    "Armadura de Cabeza (Cuero)",
+    "Armadura de Cabeza (Placa)",
+    "Armadura de Pecho (Tela)",
+    "Armadura de Pecho (Cuero)",
+    "Armadura de Pecho (Placa)",
+    "Armadura de Pies / Zapatos (Tela)",
+    "Armadura de Pies / Zapatos (Cuero)",
+    "Armadura de Pies / Zapatos (Placa)",
+    "Armas (Guerrero)",
+    "Armas (Cazador)",
+    "Armas (Mago)",
+    "Armas Secundarias",
+    "Capas",
+    "Bolsas / Bolsos"
+  ],
+  "MONTURAS": [
+    "Montura Base",
+    "Montura Rara",
+    "Montura de Batalla"
+  ],
+  "CONSUMIBLES": [
+    "Comida",
+    "Pociones",
+    "Tomos",
+    "Otros"
+  ],
+  "EQUIPO DE RECOLECCIÓN": [
+    "Pescado",
+    "Fibra",
+    "Piel",
+    "Mineral",
+    "Piedra",
+    "Madera",
+    "Rastreo"
+  ],
+  "FABRICACIÓN Y MATERIALES": [
+    "Recursos",
+    "Recursos Refinados",
+    "Recursos de Calidad",
+    "Pescados",
+    "Alquimia",
+    "Tokens"
+  ],
+  "ARTEFACTOS": [
+    "De Armas",
+    "De Pecho",
+    "De Cabeza",
+    "De Zapatos",
+    "De Armas Secundarias",
+    "De Capas",
+    "Fragmentos de Artefactos",
+    "Artefactos Cristalizados"
+  ],
+  "AGRICULTURA E ISLA": [
+    "Granja",
+    "Huerto",
+    "Pasto",
+    "Jaula",
+    "Productos Agrícolas",
+    "Muebles/Cofres",
+    "Kit de Reparación/Estaciones",
+    "Casa/Isla/Mundo"
+  ],
+  "COSMÉTICOS": [
+    "Monturas",
+    "Armas",
+    "Armadura de Pecho",
+    "Armadura de Cabeza",
+    "Zapatos",
+    "Armas Secundarias",
+    "Capas",
+    "Emote PVP"
+  ],
+  "OTROS (ECONOMÍA Y MISCELÁNEOS)": [
+    "Gremios",
+    "Trabajadores",
+    "Tokens",
+    "Bienes de Lujo",
+    "Mapas",
+    "Expediciones Hardcore",
+    "Objetivos de Misión"
+  ]
+};
+
+const getItemRenderUrl = (itemId, qualityChoice, itemCategory) => {
+  if (!itemId) return "";
+  let cleanId = itemId.toUpperCase();
+  const isConsumable = itemCategory === "CONSUMIBLES" || 
+                       cleanId.includes("_FOOD") || 
+                       cleanId.includes("_POTION") || 
+                       cleanId.includes("_MEAL_") || 
+                       cleanId.includes("_XPTOKEN");
+  
+  if (isConsumable && cleanId.includes("@")) {
+    cleanId = cleanId.split("@")[0];
+  }
+  
+  let qVal = 1;
+  if (qualityChoice) {
+    qVal = parseInt(qualityChoice) || 1;
+  }
+  
+  return `https://render.albiononline.com/v1/item/${cleanId}.png?quality=${qVal}`;
+};
+
 // Mock or Native Pywebview API
 const getApi = () => {
   if (window.pywebview && window.pywebview.api) {
@@ -70,141 +179,137 @@ const getApi = () => {
       return { success: true };
     },
     searchItems: async (categoryId, query, subCategory = "") => {
-      await new Promise(resolve => setTimeout(resolve, 400));
-      const mockDb = {
-        "1": [
-          "Arco de Badon del iniciado",
-          "Arco de Badon del experto",
-          "Arco de Badon del maestro",
-          "Arco de Badon del gran maestro",
-          "Arco de Badon del anciano",
-          "Espada del tallador del iniciado",
-          "Espada del tallador del experto",
-          "Hacha de guerra del iniciado",
-          "Maza del iniciado",
-          "Martillo de guerra del iniciado",
-          "Daga doble del experto",
-          "Guanteletes del iniciado"
-        ],
-        "2": [
-          "Armadura de placas del iniciado",
-          "Armadura de placas del experto",
-          "Chaqueta de mercenario del iniciado",
-          "Chaqueta de mercenario del experto",
-          "Toga de erudito del iniciado",
-          "Toga de erudito del experto"
-        ],
-        "3": [
-          "Casco de soldado del iniciado",
-          "Capucha de cazador del iniciado",
-          "Hábito de mago del iniciado"
-        ],
-        "4": [
-          "Botas de soldado del iniciado",
-          "Sandalias de erudito del iniciado",
-          "Zapatos de cuero del iniciado"
-        ],
-        "5": [
-          "Capa del iniciado",
-          "Capa de Bridgewatch del iniciado",
-          "Capa de Fort Sterling del iniciado",
-          "Capa de Lymhurst del iniciado",
-          "Capa de Martlock del iniciado",
-          "Capa de Thetford del iniciado",
-          "Capa de Caerleon del iniciado",
-          "Capa de Brecilien del iniciado",
-          "Capa avaloniana del iniciado",
-          "Capa hereje del iniciado",
-          "Capa de muerto viviente del iniciado",
-          "Capa de guardián del iniciado",
-          "Capa de Morgana del iniciado",
-          "Capa demoníaca del iniciado",
-          "Bolsa del iniciado",
-          "Bolsa de visión del iniciado"
-        ],
-        "8": [
-          "Runa del iniciado",
-          "Runa del experto",
-          "Runa del maestro",
-          "Alma del iniciado",
-          "Alma del experto",
-          "Alma del maestro",
-          "Reliquia del iniciado",
-          "Reliquia del experto",
-          "Reliquia del maestro"
-        ]
-      };
-      const items = mockDb[categoryId] || [];
-      const idMap = {
-        "1": "T4_2H_BOW_BADON",
-        "2": "T4_ARMOR_PLATE_SET1",
-        "3": "T4_HEAD_PLATE_SET1",
-        "4": "T4_SHOES_PLATE_SET1",
-        "5": "T4_CAPE",
-        "8": "T4_RUNE"
+      await new Promise(resolve => setTimeout(resolve, 100));
+      return [];
+    },
+    searchItemsUniversal: async (category, subcategory, query, tier, enchantment) => {
+      await new Promise(resolve => setTimeout(resolve, 150));
+      const mockDb = [
+        { id: "T4_MAIN_RAPIER_MORGANA", base_display_name: "Sangradora", name_es: "Sangradora del iniciado", tier: "4", enchantment: 0, category: "EQUIPO DE COMBATE", subcategory: "Armas (Cazador)" },
+        { id: "T4_MAIN_AXE", base_display_name: "Hacha de guerra", name_es: "Hacha de guerra del iniciado", tier: "4", enchantment: 0, category: "EQUIPO DE COMBATE", subcategory: "Armas (Guerrero)" },
+        { id: "T4_2H_CLEAVER_HELL", base_display_name: "Espada tallada", name_es: "Espada tallada del iniciado", tier: "4", enchantment: 0, category: "EQUIPO DE COMBATE", subcategory: "Armas (Guerrero)" },
+        { id: "T4_MAIN_FIRESTAFF_KEEPER", base_display_name: "Bastón de fuego incontrolable", name_es: "Bastón de fuego incontrolable del iniciado", tier: "4", enchantment: 0, category: "EQUIPO DE COMBATE", subcategory: "Armas (Mago)" },
+        { id: "T4_ARMOR_LEATHER_SET1", base_display_name: "Chaqueta de mercenario", name_es: "Chaqueta de mercenario del iniciado", tier: "4", enchantment: 0, category: "EQUIPO DE COMBATE", subcategory: "Armadura de Pecho (Cuero)" },
+        { id: "T4_ARMOR_LEATHER_SET3", base_display_name: "Chaqueta de asesino", name_es: "Chaqueta de asesino del iniciado", tier: "4", enchantment: 0, category: "EQUIPO DE COMBATE", subcategory: "Armadura de Pecho (Cuero)" },
+        { id: "T4_ARMOR_CLOTH_SET1", base_display_name: "Túnica de erudito", name_es: "Túnica de erudito del iniciado", tier: "4", enchantment: 0, category: "EQUIPO DE COMBATE", subcategory: "Armadura de Pecho (Tela)" },
+        { id: "T4_ARMOR_CLOTH_SET2", base_display_name: "Túnica de clérigo", name_es: "Túnica de clérigo del iniciado", tier: "4", enchantment: 0, category: "EQUIPO DE COMBATE", subcategory: "Armadura de Pecho (Tela)" },
+        { id: "T4_HEAD_LEATHER_SET2", base_display_name: "Capucha de cazador", name_es: "Capucha de cazador del iniciado", tier: "4", enchantment: 0, category: "EQUIPO DE COMBATE", subcategory: "Armadura de Cabeza (Cuero)" },
+        // Fallbacks
+        { id: "T4_2H_BOW_BADON", base_display_name: "Arco de Badon", name_es: "Arco de Badon del iniciado", tier: "4", enchantment: 0, category: "EQUIPO DE COMBATE", subcategory: "Armas (Cazador)" },
+        { id: "T4_2H_BOW_BADON@1", base_display_name: "Arco de Badon", name_es: "Arco de Badon del iniciado", tier: "4", enchantment: 1, category: "EQUIPO DE COMBATE", subcategory: "Armas (Cazador)" },
+        { id: "T4_2H_BOW_BADON@2", base_display_name: "Arco de Badon", name_es: "Arco de Badon del iniciado", tier: "4", enchantment: 2, category: "EQUIPO DE COMBATE", subcategory: "Armas (Cazador)" },
+        { id: "T5_2H_BOW_BADON", base_display_name: "Arco de Badon", name_es: "Arco de Badon del experto", tier: "5", enchantment: 0, category: "EQUIPO DE COMBATE", subcategory: "Armas (Cazador)" },
+        { id: "T6_2H_BOW_BADON@2", base_display_name: "Arco de Badon", name_es: "Arco de Badon del maestro", tier: "6", enchantment: 2, category: "EQUIPO DE COMBATE", subcategory: "Armas (Cazador)" },
+        { id: "T7_MEAL_SOUP", base_display_name: "Sopa", name_es: "Sopa de cordero de gran maestro", tier: "7", enchantment: 0, category: "CONSUMIBLES", subcategory: "Comida" },
+        { id: "T7_MEAL_SOUP@1", base_display_name: "Sopa", name_es: "Sopa de cordero de gran maestro", tier: "7", enchantment: 1, category: "CONSUMIBLES", subcategory: "Comida" },
+        { id: "T4_POTION_HEAL", base_display_name: "Poción de curación", name_es: "Poción de curación del iniciado", tier: "4", enchantment: 0, category: "CONSUMIBLES", subcategory: "Pociones" },
+        { id: "T5_MOUNT_HORSE", base_display_name: "Caballo de montar", name_es: "Caballo de montar del experto", tier: "5", enchantment: 0, category: "MONTURAS", subcategory: "Montura Base" },
+        { id: "T4_ORE", base_display_name: "Mineral", name_es: "Mineral de hierro del iniciado", tier: "4", enchantment: 0, category: "FABRICACIÓN Y MATERIALES", subcategory: "Recursos" },
+        { id: "T4_CLOTH", base_display_name: "Tela", name_es: "Tela del iniciado", tier: "4", enchantment: 0, category: "FABRICACIÓN Y MATERIALES", subcategory: "Recursos Refinados" },
+        { id: "T4_MAIN_SPEAR", base_display_name: "Lanza", name_es: "Lanza del iniciado", tier: "4", enchantment: 0, category: "EQUIPO DE COMBATE", subcategory: "Armas (Cazador)" },
+        { id: "T3_FIBER", base_display_name: "Lino", name_es: "Lino", tier: "3", enchantment: 0, category: "FABRICACIÓN Y MATERIALES", subcategory: "Recursos" }
+      ];
+      
+      let filtered = mockDb;
+      if (category && category !== "Todos") {
+        filtered = filtered.filter(x => x.category === category);
+      }
+      if (subcategory && subcategory !== "Todos") {
+        filtered = filtered.filter(x => x.subcategory === subcategory);
+      }
+      if (tier && tier !== "Todos") {
+        const tierNum = tier.replace("T", "");
+        filtered = filtered.filter(x => x.tier === tierNum);
+      }
+      if (enchantment && enchantment !== "Todos") {
+        const encNum = parseInt(enchantment.replace(".", "")) || 0;
+        filtered = filtered.filter(x => x.enchantment === encNum);
+      }
+      if (query.trim()) {
+        const q = query.trim().toLowerCase();
+        filtered = filtered.filter(x => {
+          if (q.length < 3) {
+            const getTokens = (str) => (str || "").toLowerCase().replace(/_/g, " ").split(/\s+/);
+            const tokens = [
+              ...getTokens(x.name_es),
+              ...getTokens(x.base_display_name),
+              ...getTokens(x.id)
+            ];
+            if (!tokens.some(t => t.startsWith(q))) {
+              return false;
+            }
+          }
+          return (
+            x.name_es.toLowerCase().includes(q) || 
+            x.base_display_name.toLowerCase().includes(q) ||
+            x.id.toLowerCase().includes(q)
+          );
+        });
+      }
+      
+      // Helper to sort mock items: lowest tier first, lowest enchantment first
+      const getSortKey = (x) => {
+        const t = parseInt(x.tier) || 99;
+        const e = parseInt(x.enchantment) || 0;
+        return t * 10 + e;
       };
       
-      const filtered = query.trim()
-        ? items.filter(item => item.toLowerCase().includes(query.toLowerCase()))
-        : items;
+      let sorted = [...filtered].sort((a, b) => getSortKey(a) - getSortKey(b));
+      
+      const seen = new Set();
+      const deduped = [];
+      
+      // Si la búsqueda es vacía, priorizar los predeterminados en el mock
+      if (!query.trim()) {
+        const defaultOrder = [
+          "T4_MAIN_RAPIER_MORGANA",
+          "T4_MAIN_AXE",
+          "T4_2H_CLEAVER_HELL",
+          "T4_MAIN_FIRESTAFF_KEEPER",
+          "T4_ARMOR_LEATHER_SET1",
+          "T4_ARMOR_LEATHER_SET3",
+          "T4_ARMOR_CLOTH_SET1",
+          "T4_ARMOR_CLOTH_SET2",
+          "T4_HEAD_LEATHER_SET2"
+        ];
         
-      let mapped = filtered.slice(0, 50).map(item => {
-        let itemId = idMap[categoryId] || "T4_CAPE";
-        if (categoryId === "2") {
-          if (item.includes("placas")) itemId = "T4_ARMOR_PLATE_SET1";
-          else if (item.includes("mercenario")) itemId = "T4_ARMOR_LEATHER_SET1";
-          else if (item.includes("erudito")) itemId = "T4_ARMOR_CLOTH_SET1";
-        } else if (categoryId === "3") {
-          if (item.includes("soldado")) itemId = "T4_HEAD_PLATE_SET1";
-          else if (item.includes("cazador")) itemId = "T4_HEAD_LEATHER_SET1";
-          else if (item.includes("mago")) itemId = "T4_HEAD_CLOTH_SET1";
-        } else if (categoryId === "4") {
-          if (item.includes("soldado")) itemId = "T4_SHOES_PLATE_SET1";
-          else if (item.includes("cuero")) itemId = "T4_SHOES_LEATHER_SET1";
-          else if (item.includes("erudito")) itemId = "T4_SHOES_CLOTH_SET1";
-        } else if (categoryId === "5") {
-          if (item.includes("Bolsa")) itemId = "T4_BAG";
-          else if (item.includes("Bridgewatch")) itemId = "T4_CAPEITEM_FW_BRIDGEWATCH";
-          else if (item.includes("Fort Sterling")) itemId = "T4_CAPEITEM_FW_FORTSTERLING";
-          else if (item.includes("Lymhurst")) itemId = "T4_CAPEITEM_FW_LYMHURST";
-          else if (item.includes("Martlock")) itemId = "T4_CAPEITEM_FW_MARTLOCK";
-          else if (item.includes("Thetford")) itemId = "T4_CAPEITEM_FW_THETFORD";
-          else if (item.includes("Caerleon")) itemId = "T4_CAPEITEM_FW_CAERLEON";
-          else if (item.includes("Brecilien")) itemId = "T4_CAPEITEM_FW_BRECILIEN";
-          else if (item.includes("avaloniana")) itemId = "T4_CAPEITEM_AVALON";
-          else if (item.includes("hereje")) itemId = "T4_CAPEITEM_HERETIC";
-          else if (item.includes("muerto viviente")) itemId = "T4_CAPEITEM_UNDEAD";
-          else if (item.includes("guardián")) itemId = "T4_CAPEITEM_KEEPER";
-          else if (item.includes("Morgana")) itemId = "T4_CAPEITEM_MORGANA";
-          else if (item.includes("demoníaca")) itemId = "T4_CAPEITEM_DEMON";
-          else itemId = "T4_CAPE";
-        } else if (categoryId === "8") {
-          if (item.includes("Runa")) itemId = "T4_RUNE";
-          else if (item.includes("Alma")) itemId = "T4_SOUL";
-          else if (item.includes("Reliquia")) itemId = "T4_RELIC";
-        }
-        return {
-          display_name: item.includes(" del ") ? item.split(" del ")[0] : item,
-          id: itemId
-        };
-      });
-
-      if (subCategory) {
-        const sub = subCategory.toUpperCase();
-        if (sub === "PLACA") {
-          mapped = mapped.filter(x => x.id.includes("_PLATE_"));
-        } else if (sub === "CUERO") {
-          mapped = mapped.filter(x => x.id.includes("_LEATHER_"));
-        } else if (sub === "TELA") {
-          mapped = mapped.filter(x => x.id.includes("_CLOTH_"));
-        } else if (sub === "CAPA") {
-          mapped = mapped.filter(x => x.id.includes("_CAPE"));
-        } else if (sub === "BOLSA") {
-          mapped = mapped.filter(x => x.id.includes("_BAG"));
+        const defaultsMatching = sorted.filter(x => defaultOrder.includes(x.id));
+        defaultsMatching.sort((a, b) => defaultOrder.indexOf(a.id) - defaultOrder.indexOf(b.id));
+        
+        for (const x of defaultsMatching) {
+          if (!seen.has(x.base_display_name)) {
+            seen.add(x.base_display_name);
+            deduped.push(x);
+          }
         }
       }
-
-      return mapped;
+      
+      // Rellenar hasta 8
+      for (const x of sorted) {
+        if (!seen.has(x.base_display_name)) {
+          seen.add(x.base_display_name);
+          deduped.push(x);
+          if (deduped.length >= 8) {
+            break;
+          }
+        }
+      }
+      
+      const resultSlice = deduped.slice(0, 8);
+      
+      return resultSlice.map(x => {
+        const encSuffix = x.enchantment > 0 ? `.${x.enchantment}` : "";
+        const tierLabel = x.tier ? `T${x.tier}${encSuffix}` : "";
+        const display_name = tierLabel ? `${x.name_es} (${tierLabel})` : x.name_es;
+        return {
+          id: x.id,
+          display_name: display_name,
+          base_display_name: x.base_display_name,
+          tier: x.tier,
+          enchantment: x.enchantment,
+          category: x.category
+        };
+      });
     },
     getPrices: async (selectedName, tierChoice, encChoice, qualityChoice, server) => {
       await new Promise(resolve => setTimeout(resolve, 1000));
@@ -672,21 +777,18 @@ function App() {
   const [dbLoading, setDbLoading] = useState(true);
   const [dbError, setDbError] = useState(null);
   
-  const [selectedMainTab, setSelectedMainTab] = useState("equipamiento");
-  const [selectedCategory, setSelectedCategory] = useState("1");
+  const [category, setCategory] = useState("");
+  const [subCategory, setSubCategory] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
   const [searchResults, setSearchResults] = useState([]);
   const [searching, setSearching] = useState(false);
   
   const [selectedItem, setSelectedItem] = useState(null);
-  const [itemTiers, setItemTiers] = useState([]);
-  const [materialsRefinedFilter, setMaterialsRefinedFilter] = useState(false);
   
   const [tier, setTier] = useState("");
   const [enchantment, setEnchantment] = useState("");
   const [quality, setQuality] = useState("");
   const [server, setServer] = useState("west");
-  const [subCategory, setSubCategory] = useState("");
   
   const [pricesLoading, setPricesLoading] = useState(false);
   const [pricesData, setPricesData] = useState(null);
@@ -984,15 +1086,15 @@ function App() {
     initApp();
   }, []);
 
-  // Búsqueda en segundo plano al cambiar query o categoría
+  // Búsqueda en segundo plano al cambiar query o filtros
   useEffect(() => {
-    if (!dbLoaded) return;
+    if (!dbLoaded || !api.current) return;
     
     const delayDebounce = setTimeout(async () => {
       setSearching(true);
       try {
-        const results = await api.current.searchItems(selectedCategory, searchQuery, subCategory);
-        setSearchResults(results);
+        const results = await api.current.searchItemsUniversal(category, subCategory, searchQuery, tier, enchantment);
+        setSearchResults(results || []);
       } catch (err) {
         console.error("Error al buscar items:", err);
       } finally {
@@ -1001,60 +1103,22 @@ function App() {
     }, 250);
 
     return () => clearTimeout(delayDebounce);
-  }, [searchQuery, selectedCategory, subCategory, dbLoaded]);
+  }, [searchQuery, category, subCategory, tier, enchantment, dbLoaded]);
 
-  const handleSelectCategory = (catId) => {
-    setSelectedCategory(catId);
-    setSubCategory("");
-    setSearchQuery("");
-    setSearchResults([]);
-    setSelectedItem(null);
-    setPricesData(null);
-    setItemTiers([]);
-    setTier("");
-    setEnchantment("");
-    setQuality("");
-  };
+  // Reactive Live Price Query on Selection/Filter change
+  useEffect(() => {
+    if (!selectedItem || !api.current) return;
+    
+    const delayDebounce = setTimeout(() => {
+      fetchPrices();
+    }, 150);
+    
+    return () => clearTimeout(delayDebounce);
+  }, [selectedItem, tier, enchantment, quality, server]);
 
-  const handleSelectItem = async (itemName) => {
+  const handleSelectItem = (itemName) => {
     setSelectedItem(itemName);
-    setTier("");
-    setEnchantment("");
-    setQuality("");
     setPricesData(null);
-    setItemTiers([]);
-    
-    if (itemName) {
-      try {
-        const tiers = await api.current.getItemTiers(itemName);
-        setItemTiers(tiers || []);
-      } catch (err) {
-        console.error("Error al obtener tiers:", err);
-      }
-    }
-  };
-
-  const handleSelectMainTab = (tab) => {
-    setSelectedMainTab(tab);
-    setSubCategory("");
-    setSearchQuery("");
-    setSearchResults([]);
-    setSelectedItem(null);
-    setPricesData(null);
-    setItemTiers([]);
-    setTier("");
-    setEnchantment("");
-    setQuality("");
-    
-    if (tab === "equipamiento") {
-      setSelectedCategory("1");
-    } else if (tab === "consumibles") {
-      setSelectedCategory("71");
-    } else if (tab === "materiales") {
-      setSelectedCategory("6");
-    } else if (tab === "artefactos") {
-      setSelectedCategory("8");
-    }
   };
 
   const getSelectedDisplayName = (item) => {
@@ -1280,280 +1344,112 @@ function App() {
         <main className="flex-1 grid grid-cols-1 lg:grid-cols-12 overflow-hidden">
           {/* LEFT PANEL: Search and Categories */}
           <section className="lg:col-span-5 border-r border-albion-border/40 bg-slate-950/20 p-5 flex flex-col gap-5 lg:overflow-hidden overflow-y-auto relative">
-            
-            {/* Main Category Tabs */}
-            <div>
-              <label className="text-[10px] text-slate-400 font-bold uppercase tracking-widest block mb-2.5">1. Categoría Principal</label>
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-2 bg-slate-950/80 border border-albion-border/60 p-1.5 rounded-lg shadow-inner">
-                <button
-                  onClick={() => handleSelectMainTab("equipamiento")}
-                  className={`py-2 px-2 rounded-md text-xs font-bold uppercase tracking-wider transition-all duration-200 cursor-pointer text-center flex flex-col items-center gap-1.5 ${
-                    selectedMainTab === "equipamiento"
-                      ? "bg-amber-500/10 text-albion-gold border border-albion-gold/40 shadow-[0_0_10px_rgba(198,161,82,0.15)]"
-                      : "text-slate-400 hover:text-slate-200 border border-transparent hover:bg-slate-900/40"
-                  }`}
+            {/* Unified Search Deck */}
+            <div className="flex flex-col gap-4">
+              <div>
+                <label className="text-[10px] text-slate-400 font-bold uppercase tracking-widest block mb-1.5">1. Categoría de Ítem</label>
+                <select
+                  value={category}
+                  onChange={(e) => {
+                    setCategory(e.target.value);
+                    setSubCategory(""); // Reset subcategory to "Todos"
+                  }}
+                  className="w-full bg-slate-950 border border-albion-border/80 text-xs text-slate-200 px-3.5 py-3 rounded-md outline-none focus:border-albion-gold font-bold uppercase tracking-wider"
                 >
-                  <span className="text-base">🛡️</span>
-                  <span className="text-[9px] sm:text-[10px]">Equipamiento</span>
-                </button>
-                <button
-                  onClick={() => handleSelectMainTab("consumibles")}
-                  className={`py-2 px-2 rounded-md text-xs font-bold uppercase tracking-wider transition-all duration-200 cursor-pointer text-center flex flex-col items-center gap-1.5 ${
-                    selectedMainTab === "consumibles"
-                      ? "bg-amber-500/10 text-albion-gold border border-albion-gold/40 shadow-[0_0_10px_rgba(198,161,82,0.15)]"
-                      : "text-slate-400 hover:text-slate-200 border border-transparent hover:bg-slate-900/40"
-                  }`}
-                >
-                  <span className="text-base">🧪</span>
-                  <span className="text-[9px] sm:text-[10px]">Consumibles</span>
-                </button>
-                <button
-                  onClick={() => handleSelectMainTab("materiales")}
-                  className={`py-2 px-2 rounded-md text-xs font-bold uppercase tracking-wider transition-all duration-200 cursor-pointer text-center flex flex-col items-center gap-1.5 ${
-                    selectedMainTab === "materiales"
-                      ? "bg-amber-500/10 text-albion-gold border border-albion-gold/40 shadow-[0_0_10px_rgba(198,161,82,0.15)]"
-                      : "text-slate-400 hover:text-slate-200 border border-transparent hover:bg-slate-900/40"
-                  }`}
-                >
-                  <span className="text-base">🪵</span>
-                  <span className="text-[9px] sm:text-[10px]">Materiales</span>
-                </button>
-                <button
-                  onClick={() => handleSelectMainTab("artefactos")}
-                  className={`py-2 px-2 rounded-md text-xs font-bold uppercase tracking-wider transition-all duration-200 cursor-pointer text-center flex flex-col items-center gap-1.5 ${
-                    selectedMainTab === "artefactos"
-                      ? "bg-amber-500/10 text-albion-gold border border-albion-gold/40 shadow-[0_0_10px_rgba(198,161,82,0.15)]"
-                      : "text-slate-400 hover:text-slate-200 border border-transparent hover:bg-slate-900/40"
-                  }`}
-                >
-                  <span className="text-base">🔮</span>
-                  <span className="text-[9px] sm:text-[10px]">Artefactos</span>
-                </button>
-              </div>
-            </div>
-
-            {/* Sub-Category Selector (only shown for Equipamiento) */}
-            {selectedMainTab === "equipamiento" && (
-              <div className="animate-fadeIn">
-                <label className="text-[10px] text-slate-400 font-bold uppercase tracking-widest block mb-2">2. Tipo de Equipamiento</label>
-                <div className="grid grid-cols-5 gap-1.5">
-                  {categories.slice(0, 5).map(cat => (
-                    <button
-                      key={cat.id}
-                      onClick={() => handleSelectCategory(cat.id)}
-                      className={`flex flex-col items-center justify-center py-2 px-1 rounded-md border text-center transition-all duration-300 group cursor-pointer ${
-                        selectedCategory === cat.id
-                          ? 'bg-amber-500/10 border-albion-gold text-albion-gold shadow-[0_0_10px_rgba(198,161,82,0.15)]'
-                          : 'bg-slate-900/50 border-albion-border/40 text-slate-400 hover:border-slate-600 hover:text-slate-200'
-                      }`}
-                    >
-                      <div className={`mb-1 transition-transform duration-300 group-hover:scale-110 ${selectedCategory === cat.id ? 'text-albion-gold' : 'text-slate-400'}`}>
-                        {cat.icon}
-                      </div>
-                      <span className="text-[8px] font-bold tracking-wide uppercase truncate w-full">{cat.name}</span>
-                    </button>
+                  <option value="">TODAS LAS CATEGORÍAS</option>
+                  {Object.keys(CATEGORIES_TREE).filter(c => c !== "Todos").map(catName => (
+                    <option key={catName} value={catName}>{catName}</option>
                   ))}
-                </div>
+                </select>
               </div>
-            )}
 
-            {/* Filtro de Material (Placa, Cuero, Tela) para Armadura, Casco y Botas */}
-            {selectedMainTab === "equipamiento" && (selectedCategory === "2" || selectedCategory === "3" || selectedCategory === "4") && (
-              <div className="animate-fadeIn mt-3.5">
-                <label className="text-[10px] text-slate-400 font-bold uppercase tracking-widest block mb-2">3. Filtro de Material</label>
-                <div className="grid grid-cols-4 gap-1.5 bg-slate-950/80 border border-albion-border/60 p-1.5 rounded-lg shadow-inner">
-                  {[
-                    { id: "", name: "Todos" },
-                    { id: "placa", name: "Placa" },
-                    { id: "cuero", name: "Cuero" },
-                    { id: "tela", name: "Tela" }
-                  ].map(sub => (
-                    <button
-                      key={sub.id}
-                      onClick={() => setSubCategory(sub.id)}
-                      className={`py-1.5 rounded text-[10px] font-bold uppercase tracking-wider transition duration-200 cursor-pointer text-center ${
-                        subCategory === sub.id
-                          ? "bg-amber-500/10 text-albion-gold border border-albion-gold/30 shadow-[0_0_8px_rgba(198,161,82,0.1)]"
-                          : "text-slate-400 hover:text-slate-200 border border-transparent hover:bg-slate-900/40"
-                      }`}
-                    >
-                      {sub.name}
-                    </button>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {selectedMainTab === "equipamiento" && selectedCategory === "5" && (
-              <div className="animate-fadeIn mt-3.5">
-                <label className="text-[10px] text-slate-400 font-bold uppercase tracking-widest block mb-2">3. Filtro de Accesorio</label>
-                <div className="grid grid-cols-3 gap-1.5 bg-slate-950/80 border border-albion-border/60 p-1.5 rounded-lg shadow-inner">
-                  {[
-                    { id: "", name: "Todos" },
-                    { id: "capa", name: "Capa" },
-                    { id: "bolsa", name: "Bolsa" }
-                  ].map(sub => (
-                    <button
-                      key={sub.id}
-                      onClick={() => setSubCategory(sub.id)}
-                      className={`py-1.5 rounded text-[10px] font-bold uppercase tracking-wider transition duration-200 cursor-pointer text-center ${
-                        subCategory === sub.id
-                          ? "bg-amber-500/10 text-albion-gold border border-albion-gold/30 shadow-[0_0_8px_rgba(198,161,82,0.1)]"
-                          : "text-slate-400 hover:text-slate-200 border border-transparent hover:bg-slate-900/40"
-                      }`}
-                    >
-                      {sub.name}
-                    </button>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {/* Sub-Category Selector (only shown for Consumibles) */}
-            {selectedMainTab === "consumibles" && (
-              <div className="animate-fadeIn flex flex-col gap-4">
-                <div>
-                  <label className="text-[10px] text-slate-400 font-bold uppercase tracking-widest block mb-2">2. Tipo de Consumible</label>
-                  <div className="grid grid-cols-4 gap-1.5">
-                    {[
-                      { id: "71", name: "Comida", icon: "🍖" },
-                      { id: "72", name: "Pociones", icon: "🧪" },
-                      { id: "73", name: "Tomos", icon: "📚" },
-                      { id: "74", name: "Otros", icon: "🗺️" }
-                    ].map(cat => (
-                      <button
-                        key={cat.id}
-                        onClick={() => handleSelectCategory(cat.id)}
-                        className={`flex flex-col items-center justify-center py-2 px-1 rounded-md border text-center transition-all duration-300 group ${
-                          selectedCategory === cat.id
-                            ? 'bg-amber-500/10 border-albion-gold text-albion-gold shadow-[0_0_10px_rgba(198,161,82,0.15)]'
-                            : 'bg-slate-900/50 border-albion-border/40 text-slate-400 hover:border-slate-600 hover:text-slate-200'
-                        }`}
-                      >
-                        <div className="text-base mb-1 transition-transform duration-300 group-hover:scale-110">
-                          {cat.icon}
-                        </div>
-                        <span className="text-[8px] font-bold tracking-wide uppercase truncate w-full">{cat.name}</span>
-                      </button>
+              {category && CATEGORIES_TREE[category] && CATEGORIES_TREE[category].length > 0 && (
+                <div className="animate-fadeIn">
+                  <label className="text-[10px] text-slate-400 font-bold uppercase tracking-widest block mb-1.5">2. Subcategoría</label>
+                  <select
+                    value={subCategory}
+                    onChange={(e) => setSubCategory(e.target.value)}
+                    className="w-full bg-slate-950 border border-albion-border/80 text-xs text-slate-200 px-3.5 py-3 rounded-md outline-none focus:border-albion-gold font-bold uppercase tracking-wider"
+                  >
+                    <option value="">TODAS LAS SUBCATEGORÍAS</option>
+                    {CATEGORIES_TREE[category].map(subName => (
+                      <option key={subName} value={subName}>{subName}</option>
                     ))}
-                  </div>
+                  </select>
                 </div>
+              )}
 
-                {/* Static Food Grid (only shown when selectedCategory is Comida "71") */}
-                {selectedCategory === "71" && (
-                  <div className="flex flex-col gap-2 animate-fadeIn">
-                    <label className="text-[10px] text-slate-400 font-bold uppercase tracking-widest block">3. Seleccionar Comida</label>
-                    <div className="grid grid-cols-3 gap-2">
-                      {foodMap.map(food => {
-                        const isSelected = selectedItem === food.id;
-                        const previewId = foodPreviewIds[food.id] || `T7_${food.id}`;
-                        const displayName = getSelectedDisplayName(food.id);
-                        return (
-                          <button
-                            key={food.id}
-                            onClick={() => handleSelectItem(food.id)}
-                            className={`flex flex-col items-center justify-center py-2 px-1 rounded-md border text-center transition-all duration-300 group cursor-pointer ${
-                              isSelected
-                                ? 'bg-amber-500/10 border-albion-gold text-albion-gold shadow-[0_0_12px_rgba(198,161,82,0.15)]'
-                                : 'bg-slate-900/50 border-albion-border/40 text-slate-400 hover:border-slate-600 hover:text-slate-200'
-                            }`}
-                          >
-                            <div className="w-10 h-10 rounded bg-slate-950/60 border border-albion-border/30 flex items-center justify-center overflow-hidden mb-1 group-hover:scale-105 transition-transform shrink-0">
-                              <LazyLoadImage
-                                src={`https://render.albiononline.com/v1/item/${previewId}.png`}
-                                effect="blur"
-                                className="w-9 h-9 object-contain"
-                                alt={displayName}
-                              />
-                            </div>
-                            <span className="text-[9px] font-bold tracking-wide uppercase truncate w-full">{displayName}</span>
-                          </button>
-                        );
-                      })}
-                    </div>
-                  </div>
-                )}
-              </div>
-            )}
-
-            {/* Materials Toggles and Grid (only shown for Materiales) */}
-            {selectedMainTab === "materiales" && (
-              <div className="flex flex-col gap-4 animate-fadeIn">
-                {/* Raw vs Refined Toggle */}
-                <div className="flex flex-col gap-1.5">
-                  <label className="text-[10px] text-slate-400 font-bold uppercase tracking-widest block">2. Tipo de Recurso</label>
-                  <div className="flex bg-slate-950/80 border border-albion-border/60 p-1 rounded-md">
-                    <button
-                      onClick={() => { setMaterialsRefinedFilter(false); handleSelectItem(null); }}
-                      className={`flex-1 py-1.5 text-[10px] font-bold uppercase tracking-wider rounded transition cursor-pointer ${
-                        !materialsRefinedFilter
-                          ? "bg-amber-500/10 text-albion-gold border border-albion-gold/30"
-                          : "text-slate-400 hover:text-slate-200 border border-transparent"
-                      }`}
+              {/* Transversal Global Filters Grid */}
+              <div>
+                <label className="text-[10px] text-slate-400 font-bold uppercase tracking-widest block mb-1.5">3. Filtros Globales (Permisivos)</label>
+                <div className="grid grid-cols-3 gap-2">
+                  {/* Tier */}
+                  <div>
+                    <span className="text-[9px] text-slate-500 font-bold uppercase block mb-1">Tier</span>
+                    <select
+                      value={tier ? `T${tier}` : ""}
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        setTier(val ? val.replace("T", "") : "");
+                      }}
+                      className="w-full bg-slate-900 border border-albion-border/60 text-[10px] text-slate-200 px-2.5 py-2.5 rounded-md outline-none focus:border-albion-gold font-semibold uppercase"
                     >
-                      Sin Refinar (Crudo)
-                    </button>
-                    <button
-                      onClick={() => { setMaterialsRefinedFilter(true); handleSelectItem(null); }}
-                      className={`flex-1 py-1.5 text-[10px] font-bold uppercase tracking-wider rounded transition cursor-pointer ${
-                        materialsRefinedFilter
-                          ? "bg-amber-500/10 text-albion-gold border border-albion-gold/30"
-                          : "text-slate-400 hover:text-slate-200 border border-transparent"
-                      }`}
-                    >
-                      Refinados
-                    </button>
+                      <option value="">Todos</option>
+                      {[1, 2, 3, 4, 5, 6, 7, 8].map(t => (
+                        <option key={t} value={`T${t}`}>Tier {t}</option>
+                      ))}
+                    </select>
                   </div>
-                </div>
 
-                {/* Materials Grid */}
-                <div className="flex flex-col gap-2">
-                  <label className="text-[10px] text-slate-400 font-bold uppercase tracking-widest block">3. Seleccionar Material</label>
-                  <div className="grid grid-cols-5 gap-1.5">
-                    {(materialsRefinedFilter ? MATERIALS_LIST.refined : MATERIALS_LIST.raw).map(mat => {
-                      const isSelected = selectedItem === mat.id;
-                      return (
-                        <button
-                          key={mat.id}
-                          onClick={() => handleSelectItem(mat.id)}
-                          className={`flex flex-col items-center justify-center py-2 px-1 rounded-md border text-center transition-all duration-300 group cursor-pointer ${
-                            isSelected
-                              ? 'bg-amber-500/10 border-albion-gold text-albion-gold shadow-[0_0_12px_rgba(198,161,82,0.15)]'
-                              : 'bg-slate-900/50 border-albion-border/40 text-slate-400 hover:border-slate-600 hover:text-slate-200'
-                          }`}
-                        >
-                          <div className="w-10 h-10 rounded bg-slate-950/60 border border-albion-border/30 flex items-center justify-center overflow-hidden mb-1 group-hover:scale-105 transition-transform shrink-0">
-                            <LazyLoadImage
-                              src={`https://render.albiononline.com/v1/item/${mat.previewId}.png`}
-                              effect="blur"
-                              className="w-9 h-9 object-contain"
-                              alt={mat.name}
-                            />
-                          </div>
-                          <span className="text-[9px] font-bold tracking-wide uppercase truncate w-full">{mat.name}</span>
-                        </button>
-                      );
-                    })}
+                  {/* Enchantment */}
+                  <div>
+                    <span className="text-[9px] text-slate-500 font-bold uppercase block mb-1">Encanto</span>
+                    <select
+                      value={enchantment ? `.${enchantment}` : ""}
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        setEnchantment(val ? val.replace(".", "") : "");
+                      }}
+                      className="w-full bg-slate-900 border border-albion-border/60 text-[10px] text-slate-200 px-2.5 py-2.5 rounded-md outline-none focus:border-albion-gold font-semibold uppercase"
+                    >
+                      <option value="">Todos</option>
+                      <option value=".0">.0 (Base)</option>
+                      <option value=".1">.1</option>
+                      <option value=".2">.2</option>
+                      <option value=".3">.3</option>
+                      <option value=".4">.4</option>
+                    </select>
+                  </div>
+
+                  {/* Quality */}
+                  <div>
+                    <span className="text-[9px] text-slate-500 font-bold uppercase block mb-1">Calidad</span>
+                    <select
+                      value={quality}
+                      onChange={(e) => setQuality(e.target.value)}
+                      className="w-full bg-slate-900 border border-albion-border/60 text-[10px] text-slate-200 px-2.5 py-2.5 rounded-md outline-none focus:border-albion-gold font-semibold uppercase"
+                    >
+                      <option value="">Todos</option>
+                      <option value="1">Normal</option>
+                      <option value="2">Buena</option>
+                      <option value="3">Notable</option>
+                      <option value="4">Sobresaliente</option>
+                      <option value="5">Obra Maestra</option>
+                    </select>
                   </div>
                 </div>
               </div>
-            )}
 
-            {/* Search Input Box (only shown for Equipamiento and Consumibles except Comida) */}
-            {selectedMainTab !== "materiales" && selectedCategory !== "71" && (
+              {/* General Search Input */}
               <div className="flex flex-col gap-1.5">
-                <label className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">
-                  {selectedMainTab === "artefactos" ? "2. Buscar Nombre del Artefacto" : 
-                   (selectedMainTab === "equipamiento" && (selectedCategory === "2" || selectedCategory === "3" || selectedCategory === "4" || selectedCategory === "5")) 
-                   ? "4. Buscar Nombre del Ítem" : "3. Buscar Nombre del Ítem"}
-                </label>
+                <label className="text-[10px] text-slate-400 font-bold uppercase tracking-widest block">4. Buscador de Nombre</label>
                 <div className="relative">
                   <input
                     type="text"
-                    placeholder={selectedMainTab === "artefactos" ? "Ej: Runa, Alma, Reliquia..." : "Ej: Badon, Talla, Guante..."}
+                    placeholder="Ej: Bow, Soup, Horse, Badon, Runa..."
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
-                    className="w-full bg-slate-950/80 border border-albion-border/80 focus:border-albion-gold text-sm text-slate-200 pl-4.5 pr-10 py-3 rounded-md outline-none transition-all placeholder-slate-600 font-medium"
+                    className="w-full bg-slate-950/80 border border-albion-border/80 focus:border-albion-gold text-sm text-slate-200 pl-4.5 pr-10 py-3 rounded-md outline-none transition-all placeholder-slate-650 font-medium"
                   />
                   <div className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-600">
                     {searching ? (
@@ -1573,165 +1469,81 @@ function App() {
                   </div>
                 </div>
               </div>
-            )}
+            </div>
 
-            {/* Filters and Search Action - Static/Sticky below selection */}
+            {/* Sticky Card showing Selected Item Family if any */}
             {selectedItem && (
-              <div className="bg-slate-950/95 border border-albion-gold/30 p-4 rounded-md flex flex-col gap-4 animate-fadeIn sticky top-0 z-10 shadow-xl backdrop-blur-md">
-                <div className="border-b border-albion-border/40 pb-2 flex justify-between items-center">
-                  <div>
-                    <span className="text-[10px] text-slate-500 font-bold uppercase tracking-wider block">Seleccionado:</span>
-                    <span className="text-xs font-bold text-albion-gold truncate block mt-0.5 max-w-[200px]" title={selectedItem}>
-                      {getSelectedDisplayName(selectedItem)}
-                    </span>
-                  </div>
-                  <button 
-                    onClick={() => handleSelectItem(null)}
-                    className="text-slate-500 hover:text-slate-300 text-xs font-bold p-1 cursor-pointer"
-                    title="Desmarcar"
-                  >
-                    ✕
-                  </button>
+              <div className="bg-slate-950/95 border border-albion-gold/30 p-3 rounded-md flex justify-between items-center animate-fadeIn shadow-xl backdrop-blur-md shrink-0">
+                <div className="min-w-0">
+                  <span className="text-[8px] text-slate-500 font-bold uppercase tracking-wider block">Ítem Seleccionado:</span>
+                  <span className="text-xs font-bold text-albion-gold truncate block mt-0.5 max-w-[240px]" title={selectedItem}>
+                    {getSelectedDisplayName(selectedItem)}
+                  </span>
                 </div>
-                
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <label className="text-[10px] text-slate-400 font-bold uppercase tracking-widest block mb-1.5">Tier (Filtro)</label>
-                    <select
-                      value={tier}
-                      onChange={(e) => setTier(e.target.value)}
-                      className="w-full bg-slate-900 border border-albion-border/60 text-xs text-slate-200 px-3 py-2 rounded-md outline-none focus:border-albion-gold font-semibold"
-                    >
-                      <option value="">TODOS</option>
-                      {itemTiers && itemTiers.length > 0 ? (
-                        itemTiers.map(t => (
-                          <option key={t.tier} value={t.tier}>{t.name} (T{t.tier})</option>
-                        ))
-                      ) : (
-                        <>
-                          <option value="1">Tier 1</option>
-                          <option value="2">Tier 2</option>
-                          <option value="3">Tier 3</option>
-                          <option value="4">Tier 4</option>
-                          <option value="5">Tier 5</option>
-                          <option value="6">Tier 6</option>
-                          <option value="7">Tier 7</option>
-                          <option value="8">Tier 8</option>
-                        </>
-                      )}
-                    </select>
-                  </div>
-
-                {selectedCategory !== "8" && !selectedCategory.startsWith("7") && (
-                  <div>
-                    <label className="text-[10px] text-slate-400 font-bold uppercase tracking-widest block mb-1.5">Encantamiento</label>
-                    <select
-                      value={enchantment}
-                      onChange={(e) => setEnchantment(e.target.value)}
-                      className="w-full bg-slate-900 border border-albion-border/60 text-xs text-slate-200 px-3 py-2 rounded-md outline-none focus:border-albion-gold font-semibold"
-                    >
-                      <option value="">TODOS</option>
-                      <option value="0">Normal</option>
-                      <option value="1">Encantamiento 1</option>
-                      <option value="2">Encantamiento 2</option>
-                      <option value="3">Encantamiento 3</option>
-                      <option value="4">Encantamiento 4</option>
-                    </select>
-                  </div>
-                )}
-                </div>
-
-                {selectedCategory !== "6" && selectedCategory !== "8" && !selectedCategory.startsWith("7") && (
-                  <div>
-                    <label className="text-[10px] text-slate-400 font-bold uppercase tracking-widest block mb-1.5">Calidad</label>
-                    <select
-                      value={quality}
-                      onChange={(e) => setQuality(e.target.value)}
-                      className="w-full bg-slate-900 border border-albion-border/60 text-xs text-slate-200 px-3 py-2 rounded-md outline-none focus:border-albion-gold font-semibold"
-                    >
-                      <option value="">TODOS</option>
-                      <option value="1">Normal</option>
-                      <option value="2">Bueno (Good)</option>
-                      <option value="3">Notable (Outstanding)</option>
-                      <option value="4">Sobresaliente (Excellent)</option>
-                      <option value="5">Obra Maestra (Masterpiece)</option>
-                    </select>
-                  </div>
-                )}
-
-                <button
-                  onClick={fetchPrices}
-                  disabled={pricesLoading}
-                  className="w-full py-3 bg-gradient-to-r from-albion-gold to-amber-600 hover:from-albion-gold-hover hover:to-amber-500 text-slate-950 font-bold text-xs uppercase tracking-wider rounded-md shadow-lg shadow-amber-950/20 active:translate-y-px transition disabled:opacity-50 flex items-center justify-center gap-2 cursor-pointer"
+                <button 
+                  onClick={() => handleSelectItem(null)}
+                  className="text-slate-500 hover:text-slate-300 text-xs font-bold p-1 cursor-pointer shrink-0"
+                  title="Desmarcar"
                 >
-                  {pricesLoading ? (
-                    <>
-                      <div className="w-3.5 h-3.5 border-2 border-slate-950 border-t-transparent animate-spin rounded-full"></div>
-                      Buscando Precios...
-                    </>
-                  ) : (
-                    <>
-                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                      </svg>
-                      Consultar Precios
-                    </>
-                  )}
+                  ✕
                 </button>
               </div>
             )}
 
-            {/* Results Lists (only shown for Equipamiento and Consumibles except Comida) */}
-            {selectedMainTab !== "materiales" && selectedCategory !== "71" && (
-              <div className="flex-1 flex flex-col min-h-[220px]">
-                <label className="text-[10px] text-slate-400 font-bold uppercase tracking-widest block mb-2.5">
-                  {selectedMainTab === "artefactos" ? "3. Selecciona el artefacto de la Lista" : "3. Selecciona el ítem de la Lista"}
-                </label>
-                <div className="flex-1 bg-slate-950/50 border border-albion-border/30 rounded-md overflow-y-auto lg:max-h-[250px] max-h-[350px]">
-                  {searchResults.length === 0 ? (
-                    <div className="h-full flex flex-col items-center justify-center p-6 text-slate-600 text-center">
-                      <svg className="w-8 h-8 mb-2 stroke-slate-700" fill="none" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-                      </svg>
-                      <p className="text-xs font-semibold">No hay resultados</p>
-                      <p className="text-[10px] text-slate-600 mt-1 max-w-[200px]">Escribe un nombre arriba para iniciar la búsqueda en la base de datos.</p>
-                    </div>
-                  ) : (
-                    <div className="divide-y divide-albion-border/20">
-                      {searchResults.map((item, index) => {
-                        const isSelected = selectedItem === item.display_name;
-                        return (
-                          <button
-                            key={index}
-                            onClick={() => handleSelectItem(item.display_name)}
-                            className={`w-full text-left px-4 py-2.5 text-xs font-semibold transition-all flex items-center justify-between group cursor-pointer ${
-                              isSelected
-                                ? 'bg-amber-500/10 text-albion-gold border-l-2 border-albion-gold'
-                                : 'text-slate-300 hover:bg-slate-900 hover:text-slate-100'
-                            }`}
-                          >
-                            <div className="flex items-center gap-3 min-w-0">
-                              <div className="w-8 h-8 rounded bg-slate-950/60 border border-albion-border/40 flex items-center justify-center shrink-0 overflow-hidden">
-                                <LazyLoadImage
-                                  src={`https://render.albiononline.com/v1/item/${item.id}.png`}
-                                  effect="blur"
-                                  className="w-7 h-7 object-contain"
-                                  alt={item.display_name}
-                                />
-                              </div>
-                              <span className="truncate pr-2">{item.display_name}</span>
+            {/* Results List */}
+            <div className="flex-1 flex flex-col min-h-[220px] overflow-hidden">
+              <label className="text-[10px] text-slate-400 font-bold uppercase tracking-widest block mb-2">5. Resultados de Búsqueda ({searchResults.length})</label>
+              <div className="flex-1 bg-slate-950/50 border border-albion-border/30 rounded-md overflow-y-auto max-h-[360px] lg:max-h-[none]">
+                {searchResults.length === 0 ? (
+                  <div className="h-full flex flex-col items-center justify-center p-6 text-slate-600 text-center">
+                    <svg className="w-8 h-8 mb-2 stroke-slate-700" fill="none" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                    </svg>
+                    <p className="text-xs font-semibold">No hay resultados</p>
+                    <p className="text-[10px] text-slate-650 mt-1 max-w-[200px]">Escribe un término o cambia los filtros de categoría para ver ítems.</p>
+                  </div>
+                ) : (
+                  <div className="divide-y divide-albion-border/20">
+                    {searchResults.map((item, index) => {
+                      const isSelected = selectedItem === item.base_display_name &&
+                        (tier === "" || tier === item.tier) &&
+                        (enchantment === "" || enchantment === item.enchantment.toString());
+                        
+                      return (
+                        <button
+                          key={index}
+                          onClick={() => {
+                            handleSelectItem(item.base_display_name);
+                            if (item.tier) setTier(item.tier);
+                            if (item.enchantment !== undefined) setEnchantment(item.enchantment.toString());
+                          }}
+                          className={`w-full text-left px-4 py-2.5 text-xs font-semibold transition-all flex items-center justify-between group cursor-pointer ${
+                            isSelected
+                              ? 'bg-amber-500/10 text-albion-gold border-l-2 border-albion-gold'
+                              : 'text-slate-300 hover:bg-slate-900 hover:text-slate-100'
+                          }`}
+                        >
+                          <div className="flex items-center gap-3 min-w-0">
+                            <div className="w-8 h-8 rounded bg-slate-950/60 border border-albion-border/40 flex items-center justify-center shrink-0 overflow-hidden">
+                              <LazyLoadImage
+                                src={getItemRenderUrl(item.id, quality, item.category)}
+                                effect="blur"
+                                className="w-7 h-7 object-contain"
+                                alt={item.display_name}
+                              />
                             </div>
-                            <svg className={`w-3.5 h-3.5 stroke-slate-500 group-hover:stroke-albion-gold transition-transform group-hover:translate-x-0.5 ${isSelected ? 'stroke-albion-gold' : ''}`} fill="none" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M9 5l7 7-7 7" />
-                            </svg>
-                          </button>
-                        );
-                      })}
-                    </div>
-                  )}
-                </div>
+                            <span className="truncate pr-2">{item.display_name}</span>
+                          </div>
+                          <svg className={`w-3.5 h-3.5 stroke-slate-500 group-hover:stroke-albion-gold transition-transform group-hover:translate-x-0.5 ${isSelected ? 'stroke-albion-gold' : ''}`} fill="none" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M9 5l7 7-7 7" />
+                          </svg>
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
               </div>
-            )}
+            </div>
           </section>
 
           {/* RIGHT PANEL: Results and Pricing Recommendations */}
@@ -1756,7 +1568,7 @@ function App() {
 
             {pricesError && !pricesLoading && (
               <div className="flex-1 flex flex-col items-center justify-center p-8 text-center">
-                <div className="w-12 h-12 rounded-full bg-red-950/30 border border-red-500/40 text-red-400 flex items-center justify-center text-lg mb-3">✕</div>
+                <img src="/Data_No_encontrada.png" className="w-24 h-24 object-contain mb-3 animate-pulse" alt="Sin resultados" />
                 <h3 className="text-sm font-bold text-red-400 font-display">Sin Resultados</h3>
                 <p className="text-xs text-slate-400 max-w-xs mt-1">{pricesError}</p>
               </div>

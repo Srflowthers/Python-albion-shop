@@ -53,6 +53,12 @@ def calculate_score(query, target):
     t = normalize(target)
     if not q or not t:
         return 0
+        
+    # Enforce that short queries (length < 3) must match the start of at least one token/word
+    if len(q) < 3:
+        tokens = t.replace("_", " ").split()
+        if not any(token.startswith(q) for token in tokens):
+            return 0.0
     
     # 1. Exact match
     if q == t:
@@ -236,60 +242,175 @@ class AlbionAPI:
         except Exception as e:
             return {"success": False, "error": str(e)}
 
-    def _get_item_category(self, unique_name):
+    def classify_item_universal(self, unique_name):
         if not unique_name:
-            return None
+            return "OTROS (ECONOMÍA Y MISCELÁNEOS)", "Otros"
         uname = unique_name.upper()
         
-        # Exclude artifacts, tools, and vanity/cosmetic items from equipment categories
-        if "_ARTEFACT_" in uname or "_TOOL_" in uname or uname.startswith("UNIQUE_"):
-            return None
-            
-        if "_CAPE" in uname or "_BAG" in uname:
-            return "5"  # Accesorios
-        if "_SHOES" in uname:
-            return "4"  # Botas / Pies
-        if "_HEAD" in uname:
-            return "3"  # Cascos / Cabezas
-        if "_ARMOR" in uname:
-            return "2"  # Armaduras / Pechos
-            
-        weapon_keywords = [
-            "_BOW", "_CROSSBOW", "_DUALCROSSBOW", "_DAGGER", "_CLAW", "_BLOODLETTER", 
-            "_SPEAR", "_LANCE", "_TRIDENT", "_AXE", "_HALBERD", "_SCYTHE", 
-            "_MACE", "_HAMMER", "_QUARTERSTAFF", "_FIRESTAFF", "_HOLYSTAFF", 
-            "_FROSTSTAFF", "_ARCANESTAFF", "_NATURESTAFF", "_CURSESTAFF", 
-            "_SHAPESHIFTER", "_KNUCKLES", "_GLOVES", "_MAIN_", "_2H_", 
-            "_OFF_", "_SHIELD", "_TORCH", "_BOOK", "_ORB", "_HORN", "_CANE"
-        ]
-        if any(kw in uname for kw in weapon_keywords):
-            return "1"  # Armas
-            
-        resource_keywords = [
-            "_CLOTH", "_LEATHER", "_METALBAR", "_PLANKS", "_STONEBLOCK",
-            "_FIBER", "_ORE", "_HIDE", "_WOOD", "_ROCK"
-        ]
-        if any(kw in uname for kw in resource_keywords):
-            return "6"  # Materiales
-            
-        if "_FOOD" in uname:
-            return "71"  # Comida
+        # 8. COSMÉTICOS (VANITY)
+        if uname.startswith("VANITY_") or "VANITY_" in uname or uname.startswith("UNIQUE_"):
+            cat = "COSMÉTICOS"
+            if "_HEAD_" in uname or "_HAIR_" in uname or "_HAT_" in uname:
+                sub = "Armadura de Cabeza"
+            elif "_ARMOR_" in uname or "_ROBE_" in uname or "_DRESS_" in uname:
+                sub = "Armadura de Pecho"
+            elif "_SHOES_" in uname or "_BOOTS_" in uname:
+                sub = "Zapatos"
+            elif "_CAPE" in uname:
+                sub = "Capas"
+            elif "_WEAPON_" in uname or "_SWORD_" in uname or "_BOW_" in uname or "_STAFF_" in uname:
+                sub = "Armas"
+            elif "_OFFHAND_" in uname or "_SHIELD_" in uname:
+                sub = "Armas Secundarias"
+            elif "_MOUNT_" in uname or "_HORSE_" in uname:
+                sub = "Monturas"
+            elif "_EMOTE_" in uname:
+                sub = "Emote PVP"
+            else:
+                sub = "Otros"
+            return cat, sub
+
+        # 4. EQUIPO DE RECOLECCIÓN (Debe contener [_GATHER_] o [_TOOL_])
+        if "_GATHER_" in uname or "_TOOL_" in uname:
+            cat = "EQUIPO DE RECOLECCIÓN"
+            if "FISHING" in uname or "FISH" in uname:
+                sub = "Pescado"
+            elif "FIBER" in uname or "HARVESTER" in uname or "SICKLE" in uname:
+                sub = "Fibra"
+            elif "HIDE" in uname or "SKINNER" in uname or "KNIFE" in uname:
+                sub = "Piel"
+            elif "ORE" in uname or "MINER" in uname or "PICKAXE" in uname:
+                sub = "Mineral"
+            elif "STONE" in uname or "QUARRYMAN" in uname or "HAMMER" in uname:
+                sub = "Piedra"
+            elif "WOOD" in uname or "LUMBERJACK" in uname or "AXE" in uname:
+                sub = "Madera"
+            elif "TRACKING" in uname or "TRACKER" in uname:
+                sub = "Rastreo"
+            else:
+                sub = "Otros"
+            return cat, sub
+
+        # 6. ARTEFACTOS (Contiene [_ARTEFACT] o [_SHARD])
+        if "_ARTEFACT" in uname or "_SHARD" in uname:
+            cat = "ARTEFACTOS"
+            if "SHARD" in uname:
+                if "CRYSTAL" in uname:
+                    sub = "Artefactos Cristalizados"
+                else:
+                    sub = "Fragmentos de Artefactos"
+            elif "_MAIN_" in uname or "_2H_" in uname or "WEAPON" in uname or any(w in uname for w in ["SWORD", "AXE", "MACE", "HAMMER", "CROSSBOW", "WARGLOVE", "BOW", "SPEAR", "DAGGER", "NATURESTAFF", "QUARTERSTAFF", "FIRESTAFF", "FROSTSTAFF", "CURSESTAFF", "ARCANESTAFF", "HOLYSTAFF", "SHAPESHIFTER"]):
+                sub = "De Armas"
+            elif "_ARMOR_" in uname:
+                sub = "De Pecho"
+            elif "_HEAD_" in uname:
+                sub = "De Cabeza"
+            elif "_SHOES_" in uname:
+                sub = "De Zapatos"
+            elif "_OFF_" in uname or "_SHIELD" in uname or "_TORCH" in uname or "_HORN" in uname or "_BOOK" in uname:
+                sub = "De Armas Secundarias"
+            elif "_CAPE" in uname:
+                sub = "De Capas"
+            else:
+                sub = "Otros"
+            return cat, sub
+
+        # 2. MONTURAS
+        if "MOUNT" in uname or "_HORSE" in uname or "_OX" in uname or "SWIFTCLAW" in uname or "DIREWOLF" in uname or "NIGHTMARE" in uname or "PANTHER" in uname or "TERRABIRD" in uname or "_FW_" in uname or "MAMMOTH_TRANSPORT" in uname:
+            cat = "MONTURAS"
+            if "_HORSE" in uname or "_OX" in uname:
+                sub = "Montura Base"
+            elif any(x in uname for x in ["SWIFTCLAW", "DIREWOLF", "NIGHTMARE", "PANTHER", "TERRABIRD"]):
+                sub = "Montura Rara"
+            elif "_FW_" in uname or "MAMMOTH" in uname or "WARGLOVE" in uname or "TRANSPORT" in uname or "BATTLE" in uname:
+                sub = "Montura de Batalla"
+            else:
+                sub = "Montura Base"
+            return cat, sub
+
+        # 3. CONSUMIBLES
+        if "_FOOD" in uname or "_AGILITY_FISH_SAUCE" in uname or "_MEAL_" in uname:
+            return "CONSUMIBLES", "Comida"
         if "_POTION" in uname:
-            return "72"  # Pociones
-        if "_SKILLBOOK" in uname or "_JOURNAL" in uname:
-            return "73"  # Tomos
-        if any(kw in uname for kw in ["_MAP", "_HELLGATE", "_BAIT", "_CREST", "QUESTITEM_EXP_TOKEN"]):
-            return "74"  # Otros Consumibles
+            return "CONSUMIBLES", "Pociones"
+        if "_XPTOKEN" in uname or "LEARNING_BOOK" in uname or "SKILLBOOK" in uname:
+            return "CONSUMIBLES", "Tomos"
+        if any(x in uname for x in ["_MAP", "_HELLGATE", "_BAIT", "_CREST", "QUESTITEM_EXP_TOKEN"]):
+            return "CONSUMIBLES", "Otros"
+
+        # 7. AGRICULTURA E ISLA
+        if "FURNITURE" in uname or "CHEST" in uname or "BED" in uname or "TABLE" in uname:
+            return "AGRICULTURA E ISLA", "Muebles/Cofres"
+        if "REPAIR" in uname or "STATION" in uname or "FORGE" in uname or "COOK" in uname or "ALCHEMIST" in uname:
+            return "AGRICULTURA E ISLA", "Kit de Reparación/Estaciones"
+        if any(x in uname for x in ["FARM", "CROP", "HERB"]):
+            return "AGRICULTURA E ISLA", "Huerto"
+        if any(x in uname for x in ["PASTURE", "BABY", "ANIMAL"]):
+            return "AGRICULTURA E ISLA", "Pasto"
+
+        # 5. FABRICACIÓN Y MATERIALES
+        clean_uname = uname.split("@")[0]
+        raw_res_suffixes = ["_ORE", "_WOOD", "_FIBER", "_HIDE", "_STONE", "_ROCK"]
+        if any(clean_uname.endswith(s) for s in raw_res_suffixes) or any(clean_uname.endswith(f"{s}_LEVEL1") or clean_uname.endswith(f"{s}_LEVEL2") or clean_uname.endswith(f"{s}_LEVEL3") or clean_uname.endswith(f"{s}_LEVEL4") for s in raw_res_suffixes):
+            return "FABRICACIÓN Y MATERIALES", "Recursos"
+        if any(ref in uname for ref in ["METALBAR", "PLANKS", "CLOTH", "LEATHER", "STONEBLOCK"]):
+            return "FABRICACIÓN Y MATERIALES", "Recursos Refinados"
+        if any(q in uname for q in ["RUNE", "SOUL", "RELIC", "SHARD_AVALONIAN", "ESSENCE"]):
+            return "FABRICACIÓN Y MATERIALES", "Recursos de Calidad"
+        if "FISH" in uname:
+            return "FABRICACIÓN Y MATERIALES", "Pescados"
+        if any(a in uname for a in ["MILK", "BUTTER", "EGG", "FLOUR"]) or "HERB" in uname or "SEED" in uname:
+            return "FABRICACIÓN Y MATERIALES", "Alquimia"
+        if "TOKEN" in uname:
+            return "FABRICACIÓN Y MATERIALES", "Tokens"
+
+        # 1. EQUIPO DE COMBATE
+        if "_HEAD_" in uname:
+            mat = "Tela" if "_CLOTH_" in uname else ("Cuero" if "_LEATHER_" in uname else "Placa")
+            return "EQUIPO DE COMBATE", f"Armadura de Cabeza ({mat})"
+        if "_ARMOR_" in uname:
+            mat = "Tela" if "_CLOTH_" in uname else ("Cuero" if "_LEATHER_" in uname else "Placa")
+            return "EQUIPO DE COMBATE", f"Armadura de Pecho ({mat})"
+        if "_SHOES_" in uname:
+            mat = "Tela" if "_CLOTH_" in uname else ("Cuero" if "_LEATHER_" in uname else "Placa")
+            return "EQUIPO DE COMBATE", f"Armadura de Pies / Zapatos ({mat})"
+        if "_OFF_" in uname or any(uname.endswith(f"_{s}") or f"_{s}_" in uname or f"_{s}@" in uname for s in ["SHIELD", "TORCH", "BOOK", "ORB", "HORN", "CANE"]):
+            return "EQUIPO DE COMBATE", "Armas Secundarias"
+        if "_CAPE" in uname:
+            return "EQUIPO DE COMBATE", "Capas"
+        if "_BAG" in uname or "_SATCHEL" in uname:
+            return "EQUIPO DE COMBATE", "Bolsas / Bolsos"
+
+        warrior_weapons = ["SWORD", "AXE", "MACE", "HAMMER", "CROSSBOW", "WARGLOVE", "KNUCKLES"]
+        hunter_weapons = ["BOW", "SPEAR", "DAGGER", "NATURESTAFF", "QUARTERSTAFF", "CLAW", "RAPIDFIRE"]
+        mage_weapons = ["FIRESTAFF", "FROSTSTAFF", "CURSESTAFF", "ARCANESTAFF", "HOLYSTAFF", "SHAPESHIFTER"]
+        if any(w in uname for w in warrior_weapons + hunter_weapons + mage_weapons) or "_MAIN_" in uname or "_2H_" in uname:
+            if any(w in uname for w in warrior_weapons):
+                return "EQUIPO DE COMBATE", "Armas (Guerrero)"
+            elif any(w in uname for w in hunter_weapons):
+                return "EQUIPO DE COMBATE", "Armas (Cazador)"
+            elif any(w in uname for w in mage_weapons):
+                return "EQUIPO DE COMBATE", "Armas (Mago)"
+            else:
+                return "EQUIPO DE COMBATE", "Armas (Guerrero)"
+
+        # 9. OTROS (ECONOMÍA Y MISCELÁNEOS)
+        if "_JOURNAL_" in uname:
+            return "OTROS (ECONOMÍA Y MISCELÁNEOS)", "Trabajadores"
+        if "LUXURYGOODS" in uname:
+            return "OTROS (ECONOMÍA Y MISCELÁNEOS)", "Bienes de Lujo"
+        if "MAP" in uname:
+            return "OTROS (ECONOMÍA Y MISCELÁNEOS)", "Mapas"
+        if "QUEST" in uname:
+            return "OTROS (ECONOMÍA Y MISCELÁNEOS)", "Objetivos de Misión"
             
-        if uname.endswith("_RUNE") or uname.endswith("_SOUL") or uname.endswith("_RELIC"):
-            return "8"  # Artefactos (Runas, Almas, Reliquias)
-            
-        return None
+        return "OTROS (ECONOMÍA Y MISCELÁNEOS)", "Otros"
 
     def _build_item_maps_cached(self):
         self.item_map = {}
         self.id_name_map = {}
         self.search_index = []
+        self.search_index_universal = []
         
         # Pass 1: Populate id_name_map
         for item in self.items:
@@ -300,7 +421,7 @@ class AlbionAPI:
                 
         seen_display_names = set()
         
-        # Pass 2: Build groupings and search index
+        # Pass 2: Build groupings and search indexes
         for item in self.items:
             item_id = item.get("UniqueName", "")
             if not item_id:
@@ -322,71 +443,216 @@ class AlbionAPI:
             if item_id not in self.item_map[base_display_name]:
                 self.item_map[base_display_name].append(item_id)
                 
-            # Classify using UniqueName
-            category = self._get_item_category(item_id)
-            if not category:
-                continue
-                
-            # Add base item (no enchantment level/suffix) to optimized search index
+            # Classify using UniqueName for search_index (legacy support)
+            # Ensure we classify with the new helper first to populate the universal index
+            cat_univ, subcat_univ = self.classify_item_universal(item_id)
+            
+            # Parse Tier
+            tier_val = ""
+            if item_id.startswith("T") and "_" in item_id:
+                t_part = item_id.split("_")[0][1:]
+                if t_part.isdigit():
+                    tier_val = t_part
+            
+            # Parse Enchantment
+            enc_val = 0
+            if "@" in item_id:
+                try:
+                    enc_val = int(item_id.split("@")[1])
+                except ValueError:
+                    pass
+            else:
+                for lvl in [1, 2, 3, 4]:
+                    if f"_LEVEL{lvl}" in item_id:
+                        enc_val = lvl
+                        break
+            
+            localized_names = item.get("LocalizedNames") or {}
+            name_es_univ = localized_names.get("ES-ES") or display_name
+            name_en_univ = localized_names.get("EN-US") or display_name
+            
+            self.search_index_universal.append({
+                "id": item_id,
+                "name_es": name_es_univ,
+                "name_en": name_en_univ,
+                "category": cat_univ,
+                "subcategory": subcat_univ,
+                "tier": tier_val,
+                "enchantment": enc_val,
+                "base_display_name": base_display_name
+            })
+            
+            # Add to legacy search_index
             if "@" not in item_id and not any(lvl in item_id for lvl in ["_LEVEL1", "_LEVEL2", "_LEVEL3", "_LEVEL4"]):
                 if base_display_name not in seen_display_names:
                     seen_display_names.add(base_display_name)
                     
-                    localized_names = item.get("LocalizedNames") or {}
-                    name_es = localized_names.get("ES-ES") or display_name
-                    name_en = localized_names.get("EN-US") or display_name
-                    
                     self.search_index.append({
-                        "name_es": clean_base_name(name_es),
-                        "name_en": clean_base_name(name_en),
+                        "name_es": clean_base_name(name_es_univ),
+                        "name_en": clean_base_name(name_en_univ),
                         "id": item_id,
-                        "category": category,
+                        "category": "1" if cat_univ == "EQUIPO DE COMBATE" and "Armas" in subcat_univ else "2", # dummy
                         "display_name": base_display_name
                     })
                     
         self.item_names = list(seen_display_names)
 
     def searchItems(self, category_id, query, sub_category=""):
+        # Legacy search fallback (not used but kept to avoid errors if referenced)
+        if not self.items:
+            return []
+        query = (query or "").strip().lower()
+        res = []
+        for x in self.search_index_universal:
+            if query in x["name_es"].lower() or query in x["name_en"].lower() or query in x["id"].lower():
+                res.append({"display_name": x["base_display_name"], "id": x["id"]})
+            if len(res) >= 50:
+                break
+        return res
+
+    def searchItemsUniversal(self, category, subcategory, query, tier, enchantment):
         if not self.items:
             return []
             
-        # Filter items belonging to the selected category
-        category_items = [x for x in self.search_index if x["category"] == category_id]
+        category = (category or "").strip()
+        subcategory = (subcategory or "").strip()
+        query = (query or "").strip()
+        tier = (tier or "").strip()
+        enchantment = (enchantment or "").strip()
         
-        # Filter by sub-category (Plate, Leather, Cloth)
-        if sub_category:
-            sub = sub_category.upper()
-            if sub == "PLACA":
-                category_items = [x for x in category_items if "_PLATE_" in x["id"]]
-            elif sub == "CUERO":
-                category_items = [x for x in category_items if "_LEATHER_" in x["id"]]
-            elif sub == "TELA":
-                category_items = [x for x in category_items if "_CLOTH_" in x["id"]]
-            elif sub == "CAPA":
-                category_items = [x for x in category_items if "_CAPE" in x["id"]]
-            elif sub == "BOLSA":
-                category_items = [x for x in category_items if "_BAG" in x["id"]]
+        filtered = self.search_index_universal
         
-        query = query.strip()
-        if not query:
-            # Return first 50 items of the category sorted alphabetically
-            category_items.sort(key=lambda x: x["display_name"])
-            return [{"display_name": x["display_name"], "id": x["id"]} for x in category_items[:50]]
+        # 1. Filter by category
+        if category and category != "Todos":
+            filtered = [x for x in filtered if x["category"] == category]
             
+        # 2. Filter by subcategory
+        if subcategory and subcategory != "Todos":
+            filtered = [x for x in filtered if x["subcategory"] == subcategory]
+            
+        # 3. Filter by Tier
+        if tier and tier != "Todos":
+            tier_num = tier.replace("T", "")
+            filtered = [x for x in filtered if x["tier"] == tier_num]
+            
+        # 4. Filter by Enchantment
+        if enchantment and enchantment != "Todos":
+            enc_num = enchantment.replace(".", "")
+            if enc_num.isdigit():
+                enc_int = int(enc_num)
+                filtered = [x for x in filtered if x["enchantment"] == enc_int]
+        
+        # Helper to sort items: lowest tier first, lowest enchantment first
+        def get_sort_key(x):
+            try:
+                t = int(x["tier"]) if x["tier"] else 99
+            except ValueError:
+                t = 99
+            return (t, x["enchantment"])
+            
+        # Sort filtered list so that the base version (lowest tier/enchantment) comes first
+        filtered_sorted = sorted(filtered, key=get_sort_key)
+        
+        # If query is empty, return representative list matching filters
+        if not query:
+            default_order = [
+                "T4_MAIN_RAPIER_MORGANA",   # Bloodletter
+                "T4_MAIN_AXE",              # Battleaxe
+                "T4_2H_CLEAVER_HELL",       # Carving Sword
+                "T4_MAIN_FIRESTAFF_KEEPER", # Wildfire Staff
+                "T4_ARMOR_LEATHER_SET1",    # Mercenary Jacket
+                "T4_ARMOR_LEATHER_SET3",    # Assassin Jacket
+                "T4_ARMOR_CLOTH_SET1",      # Cleric Robe (user's ID / Scholar Robe)
+                "T4_ARMOR_CLOTH_SET2",      # Cleric Robe (actual ID)
+                "T4_HEAD_LEATHER_SET2"      # Hunter Hood
+            ]
+            
+            # Find matching default items
+            defaults_matching = [x for x in filtered_sorted if x["id"] in default_order]
+            defaults_matching.sort(key=lambda x: default_order.index(x["id"]))
+            
+            seen = set()
+            deduped = []
+            
+            # 1. Add matching defaults first
+            for x in defaults_matching:
+                display_key = x["base_display_name"]
+                if display_key not in seen:
+                    seen.add(display_key)
+                    deduped.append(x)
+                    
+            # 2. Fill the remaining spots up to 8 with other items from the filtered list
+            if len(deduped) < 8:
+                remaining = sorted(
+                    [x for x in filtered_sorted if x["base_display_name"] not in seen],
+                    key=lambda x: x["name_es"] or x["base_display_name"]
+                )
+                for x in remaining:
+                    display_key = x["base_display_name"]
+                    if display_key not in seen:
+                        seen.add(display_key)
+                        deduped.append(x)
+                        if len(deduped) >= 8:
+                            break
+                            
+            deduped = deduped[:8]
+            
+            res = []
+            for x in deduped:
+                label = x["name_es"] or x["base_display_name"]
+                enc_suffix = f".{x['enchantment']}" if x["enchantment"] > 0 else ""
+                tier_label = f"T{x['tier']}{enc_suffix}" if x["tier"] else ""
+                display_name = f"{label} ({tier_label})" if tier_label else label
+                res.append({
+                    "id": x["id"],
+                    "display_name": display_name,
+                    "base_display_name": x["base_display_name"],
+                    "tier": x["tier"],
+                    "enchantment": x["enchantment"],
+                    "category": x["category"]
+                })
+            return res
+            
+        # 5. Fuzzy Match
         scored = []
-        for item in category_items:
-            score_es = calculate_score(query, item["name_es"])
-            score_en = calculate_score(query, item["name_en"])
-            score_id = calculate_score(query, item["id"])
+        for x in filtered_sorted:
+            score_es = calculate_score(query, x["name_es"])
+            score_en = calculate_score(query, x["name_en"])
+            score_id = calculate_score(query, x["id"])
             best_score = max(score_es, score_en, score_id)
             
-            if best_score > 0:
-                scored.append((best_score, item["display_name"], item["id"]))
+            if best_score >= 10.0:
+                scored.append((best_score, x))
                 
-        # Sort by score descending, then by display name alphabetically
-        scored.sort(key=lambda x: (-x[0], x[1]))
+        # Sort by score descending. Since python's sort is stable, if two items have the same score,
+        # the one that came first in filtered_sorted (lowest tier/enchantment) will remain first.
+        scored.sort(key=lambda x: -x[0])
         
-        return [{"display_name": x[1], "id": x[2]} for x in scored[:50]]
+        seen = set()
+        deduped = []
+        for score, x in scored:
+            display_key = x["base_display_name"]
+            if display_key not in seen:
+                seen.add(display_key)
+                deduped.append(x)
+                if len(deduped) >= 8:
+                    break
+                    
+        res = []
+        for x in deduped:
+            label = x["name_es"] or x["base_display_name"]
+            enc_suffix = f".{x['enchantment']}" if x["enchantment"] > 0 else ""
+            tier_label = f"T{x['tier']}{enc_suffix}" if x["tier"] else ""
+            display_name = f"{label} ({tier_label})" if tier_label else label
+            res.append({
+                "id": x["id"],
+                "display_name": display_name,
+                "base_display_name": x["base_display_name"],
+                "tier": x["tier"],
+                "enchantment": x["enchantment"],
+                "category": x["category"]
+            })
+        return res
 
     def getPrices(self, selected_name, tier_choice, enc_choice, quality_choice, server):
         posibles_ids = []
