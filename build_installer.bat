@@ -41,7 +41,7 @@ copy /Y logo.ico frontend\public\favicon.ico >nul
 copy /Y logo.png frontend\public\logo.png >nul
 
 echo [4/5] Creando el ejecutable con PyInstaller...
-pyinstaller --noconfirm --clean App.spec || (
+python -m PyInstaller --noconfirm --clean App.spec || (
     echo ERROR: falló PyInstaller
     exit /b 1
 )
