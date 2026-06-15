@@ -1,10 +1,32 @@
 import os
 import sys
+
+# Activar reconocimiento de DPI para evitar descuadres en capturas con escalado de Windows (ej. 125%, 150%)
+if sys.platform == 'win32':
+    try:
+        import ctypes
+        ctypes.windll.user32.SetProcessDPIAware()
+    except Exception as e:
+        print(f"Error setting DPI awareness: {e}")
+
 import json
 import requests
 import webview
 import unicodedata
 import difflib
+import threading
+import time
+import asyncio
+import pygetwindow as gw
+from PIL import Image, ImageGrab
+
+try:
+    import winrt.windows.media.ocr as ocr
+    from winrt.windows.graphics.imaging import SoftwareBitmap, BitmapPixelFormat, BitmapAlphaMode
+    import winrt.windows.storage.streams as streams
+    WINRT_OCR_AVAILABLE = True
+except Exception:
+    WINRT_OCR_AVAILABLE = False
 
 ITEMS_URL = "https://raw.githubusercontent.com/ao-data/ao-bin-dumps/master/formatted/items.json"
 ITEMS_FALLBACK_URL = "https://cdn.jsdelivr.net/gh/ao-data/ao-bin-dumps@master/formatted/items.json"
@@ -33,6 +55,18 @@ CACHE_FILE = get_cache_path()
 CACHE_DIR = os.path.dirname(CACHE_FILE)
 ZONES_FILE = os.path.join(CACHE_DIR, "zones_db.json")
 RECENT_ZONES_FILE = os.path.join(CACHE_DIR, "recent_zones.json")
+
+def log_ocr(message):
+    try:
+        log_file = os.path.join(CACHE_DIR, "ocr_log.txt")
+        if os.path.exists(log_file) and os.path.getsize(log_file) > 1024 * 1024:
+            with open(log_file, "w", encoding="utf-8") as f:
+                f.write("[LOG ROTATED]\n")
+        with open(log_file, "a", encoding="utf-8") as f:
+            timestamp = time.strftime("%Y-%m-%d %H:%M:%S")
+            f.write(f"[{timestamp}] {message}\n")
+    except Exception:
+        pass
 
 def normalize(text):
     if not text:
@@ -151,6 +185,11 @@ class AlbionAPI:
         self.zones = []
         self.recent_zones = []
         self.loadZonesDatabase()
+        
+        # OCR States
+        self.ocr_thread = None
+        self.ocr_running = False
+        self.last_detected_map = ""
 
     def set_window(self, window):
         self._window = window
@@ -869,17 +908,17 @@ class AlbionAPI:
                     with open(ZONES_FILE, "r", encoding="utf-8") as f:
                         self.zones = json.load(f)
                     
-                    # If empty, populate with default test zones
-                    if not self.zones:
+                    # If empty or outdated, populate with default test zones
+                    if not self.zones or len(self.zones) < 400:
                         try:
                             from test_zones_data import get_default_test_zones
                             self.zones = get_default_test_zones()
                             self._save_zones()
                         except ImportError:
                             pass
-                    else:
-                        # Ensure we filter out any blacklisted cities that might have snuck in
-                        self.zones = [z for z in self.zones if not is_blacklisted(z.get("n"))]
+                    
+                    # Ensure we filter out any blacklisted cities that might have snuck in
+                    self.zones = [z for z in self.zones if not is_blacklisted(z.get("n"))]
                     return {"success": True, "loaded": True}
                 except Exception as e:
                     print(f"Error loading zones database: {e}")
@@ -1303,6 +1342,174 @@ class AlbionAPI:
             
         except Exception as e:
             return {"success": False, "error": f"Error al consultar la API de eventos: {str(e)}"}
+
+    def toggleAutoMapDetection(self, status):
+        try:
+            log_ocr(f"toggleAutoMapDetection called with status: {status}")
+            if not WINRT_OCR_AVAILABLE:
+                log_ocr("Error: WINRT_OCR_AVAILABLE is False")
+                return {"success": False, "error": "El motor OCR nativo no está disponible. Asegúrate de estar ejecutando Windows 10/11."}
+                
+            self.ocr_running = bool(status)
+            
+            if self.ocr_running:
+                # Start thread if not already running
+                if self.ocr_thread is None or not self.ocr_thread.is_alive():
+                    log_ocr("Starting new OCR loop thread...")
+                    self.ocr_thread = threading.Thread(target=self._ocr_loop, daemon=True)
+                    self.ocr_thread.start()
+                return {"success": True, "running": True}
+            else:
+                log_ocr("Stopping OCR loop...")
+                self.ocr_running = False
+                return {"success": True, "running": False}
+        except Exception as e:
+            log_ocr(f"Exception in toggleAutoMapDetection: {e}")
+            return {"success": False, "error": str(e)}
+
+    def isAutoMapDetectionRunning(self):
+        return {"success": True, "running": self.ocr_running and self.ocr_thread is not None and self.ocr_thread.is_alive()}
+
+    def _ocr_loop(self):
+        log_ocr("OCR loop thread started.")
+        while self.ocr_running:
+            try:
+                raw_text = self._capture_and_ocr()
+                if raw_text and isinstance(raw_text, str) and not raw_text.startswith("Error:"):
+                    lines = [l.strip() for l in raw_text.split("\n") if l.strip()]
+                    best_match = None
+                    best_score = 0
+                    
+                    for line in lines:
+                        # Filtrar números y caracteres cortos (ej. reloj, coordenadas, oro, plata)
+                        words = line.split()
+                        filtered_words = []
+                        for w in words:
+                            w_clean = "".join([c for c in w if c.isalpha()])
+                            if len(w_clean) >= 3 and not any(c.isdigit() for c in w):
+                                filtered_words.append(w_clean)
+                            elif w_clean.lower() in ["of", "in", "de", "el", "la", "on", "t4", "t5", "t6", "t7", "t8"]:
+                                filtered_words.append(w_clean)
+                        
+                        cleaned_line = " ".join(filtered_words).strip()
+                        if len(cleaned_line) < 3:
+                            continue
+                        
+                        log_ocr(f"OCR raw line: '{line}' -> Cleaned line: '{cleaned_line}'")
+                        
+                        for z in self.zones:
+                            score = calculate_score(cleaned_line, z["n"])
+                            if score > best_score:
+                                best_score = score
+                                best_match = z
+                                
+                    if best_match:
+                        log_ocr(f"Best zone match: '{best_match['n']}' with score: {best_score}")
+                        if best_score >= 75:
+                            detected_zone_name = best_match["n"]
+                            if detected_zone_name != self.last_detected_map:
+                                log_ocr(f"New map detected! Shifting from '{self.last_detected_map}' to '{detected_zone_name}'")
+                                self.last_detected_map = detected_zone_name
+                                
+                                # Registrar como reciente
+                                self.addRecentZone(detected_zone_name)
+                                
+                                # Notificar al frontend
+                                if self._window:
+                                    log_ocr(f"Calling evaluate_js onAutoMapDetected('{detected_zone_name}')...")
+                                    self._window.evaluate_js(f"if (window.onAutoMapDetected) {{ window.onAutoMapDetected('{detected_zone_name}'); }}")
+                                else:
+                                    log_ocr("Warning: self._window is None, cannot notify frontend")
+                        else:
+                            log_ocr(f"Score {best_score} is below threshold 75, ignoring match")
+                    else:
+                        log_ocr("No matching zone found for any OCR line")
+                else:
+                    if raw_text and raw_text.startswith("Error:"):
+                        log_ocr(f"OCR Capture returned error: {raw_text}")
+                                
+            except Exception as e:
+                log_ocr(f"Error in OCR loop step: {e}")
+                
+            time.sleep(3)
+        log_ocr("OCR loop thread exiting.")
+
+    def _capture_and_ocr(self):
+        if not WINRT_OCR_AVAILABLE:
+            log_ocr("Error: WINRT_OCR_AVAILABLE is False in capture")
+            return "Error: WinRT OCR not available"
+            
+        try:
+            # Buscar ventana activa y con tamaño razonable del juego (excluyendo lanzadores minimizados y el IDE/nuestra app)
+            wins = [w for w in gw.getWindowsWithTitle('Albion Online Client') if w.title and not w.isMinimized and w.width > 500 and w.height > 400]
+            if not wins:
+                wins = [w for w in gw.getWindowsWithTitle('Albion') if w.title and not w.isMinimized and w.width > 500 and w.height > 400
+                        and "python-albion" not in w.title.lower()
+                        and "analizador" not in w.title.lower()
+                        and "ide" not in w.title.lower()]
+            # Si no hay ventanas activas de gran tamaño, intentar buscar cualquiera que no esté minimizada
+            if not wins:
+                wins = [w for w in gw.getWindowsWithTitle('Albion Online Client') if w.title and not w.isMinimized]
+            if not wins:
+                wins = [w for w in gw.getWindowsWithTitle('Albion') if w.title and not w.isMinimized
+                        and "python-albion" not in w.title.lower()
+                        and "analizador" not in w.title.lower()
+                        and "ide" not in w.title.lower()]
+            if not wins:
+                return ""
+                
+            win = wins[0]
+            
+            left, top, right, bottom = win.left, win.top, win.right, win.bottom
+            width = right - left
+            height = bottom - top
+            
+            if width <= 0 or height <= 0:
+                log_ocr(f"Warning: Invalid window size: {width}x{height}")
+                return ""
+                
+            # Recortar esquina inferior derecha (donde se ubica el minimapa y el nombre de la zona en Albion de PC)
+            crop_x1 = left + int(width * 0.77)
+            crop_y1 = top + int(height * 0.95)
+            crop_x2 = left + int(width * 0.99)
+            crop_y2 = top + int(height * 0.995)
+            
+            log_ocr(f"Capturing game window '{win.title}' ({width}x{height}). Crop bbox: ({crop_x1},{crop_y1}) to ({crop_x2},{crop_y2})")
+            
+            img = ImageGrab.grab(bbox=(crop_x1, crop_y1, crop_x2, crop_y2))
+            
+            # Redimensionar la imagen a 3x para mejorar la precisión del motor OCR en textos pequeños
+            img = img.resize((img.width * 3, img.height * 3), Image.Resampling.LANCZOS)
+            
+            # Convertir a SoftwareBitmap
+            image = img.convert("RGBA")
+            data_writer = streams.DataWriter()
+            data_writer.write_bytes(bytes(image.tobytes()))
+            bitmap = SoftwareBitmap(BitmapPixelFormat.RGBA8, image.width, image.height, BitmapAlphaMode.STRAIGHT)
+            bitmap.copy_from_buffer(data_writer.detach_buffer())
+            
+            engine = ocr.OcrEngine.try_create_from_user_profile_languages()
+            if not engine:
+                langs = ocr.OcrEngine.all_supported_languages
+                if len(langs) > 0:
+                    engine = ocr.OcrEngine.try_create_from_language(langs[0])
+                    
+            if not engine:
+                log_ocr("Error: OCR Engine could not be created")
+                return "Error: OCR Engine could not be created"
+                
+            async def run_recognize():
+                result = await engine.recognize_async(bitmap)
+                return result.text
+                
+            text = asyncio.run(run_recognize())
+            log_ocr(f"Raw OCR recognized text: '{text}'")
+            return text
+            
+        except Exception as e:
+            log_ocr(f"Exception in _capture_and_ocr: {e}")
+            return f"Error: {e}"
+
 
 def get_entrypoint():
     # Si ase ejecuta como paquete de PyInstaller, buscar en la carpeta temporal _MEIPASS

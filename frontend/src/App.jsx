@@ -823,6 +823,94 @@ function App() {
   const [radarSuggestions, setRadarSuggestions] = useState([]);
   const [showRadarDropdown, setShowRadarDropdown] = useState(false);
   const [recentZonesFromDb, setRecentZonesFromDb] = useState([]);
+  const [autoMapDetectionActive, setAutoMapDetectionActive] = useState(false);
+  const [detectedMapName, setDetectedMapName] = useState("");
+
+
+  const toggleAutoMapDetection = async () => {
+    if (!api.current) return;
+    const nextStatus = !autoMapDetectionActive;
+    try {
+      const res = await api.current.toggleAutoMapDetection(nextStatus);
+      if (res.success) {
+        setAutoMapDetectionActive(nextStatus);
+        if (!nextStatus) {
+          setDetectedMapName("");
+        }
+      } else {
+        alert("Error: " + res.error);
+      }
+    } catch (err) {
+      console.error("Error toggling auto map detection:", err);
+    }
+  };
+
+  const selectMapByName = (mapName) => {
+    if (!mapName) return;
+    if (radarData && radarData.zones) {
+      // 1. Intentar buscar en las zonas activas del radar (las que tienen muertes)
+      const found = radarData.zones.find(z => z.name.toLowerCase() === mapName.toLowerCase());
+      if (found) {
+        setSelectedZone(found);
+        return;
+      }
+    }
+    
+    // 2. Intentar buscar en la base de datos completa de todas las zonas de Albion
+    if (zonesList && zonesList.length > 0) {
+      const foundDb = zonesList.find(z => z.n.toLowerCase() === mapName.toLowerCase());
+      if (foundDb) {
+        const safeZone = {
+          name: foundDb.n,
+          type: foundDb.b === "black" ? "Black Zone" : (foundDb.b === "red" ? "Red Zone" : (foundDb.b === "yellow" ? "Yellow Zone" : "Blue Zone")),
+          death_count: 0,
+          avg_group_size: 0,
+          avg_killer_ip: 0,
+          risk_level: "green",
+          survival_gathering: 98,
+          survival_farming: 99,
+          survival_transport: 96,
+          deaths: []
+        };
+        setSelectedZone(safeZone);
+        return;
+      }
+    }
+
+    // 3. Fallback a las zonas sugeridas fijas si la base de datos no cargó
+    const matchedSuggested = SUGGESTED_WORLD_ZONES.find(
+      z => z.n.toLowerCase() === mapName.toLowerCase()
+    );
+    if (matchedSuggested) {
+      const safeZone = {
+        name: matchedSuggested.n,
+        type: matchedSuggested.b === "black" ? "Black Zone" : "Red Zone",
+        death_count: 0,
+        avg_group_size: 0,
+        avg_killer_ip: 0,
+        risk_level: "green",
+        survival_gathering: 98,
+        survival_farming: 99,
+        survival_transport: 96,
+        deaths: []
+      };
+      setSelectedZone(safeZone);
+    }
+  };
+
+  const handleSelectDetectedMap = () => {
+    selectMapByName(detectedMapName);
+  };
+
+  useEffect(() => {
+    window.onAutoMapDetected = (mapName) => {
+      setDetectedMapName(mapName);
+      selectMapByName(mapName);
+    };
+    return () => {
+      delete window.onAutoMapDetected;
+    };
+  }, [radarData, zonesList]);
 
   const refreshZonesList = async () => {
     if (!api.current) return;
@@ -1720,9 +1808,27 @@ function App() {
           <section className="lg:col-span-5 border-r border-albion-border/40 bg-slate-950/20 p-5 flex flex-col gap-5 lg:overflow-hidden overflow-y-auto">
             {/* Cabecera del Radar */}
             <div className="flex flex-col gap-2 border-b border-albion-border/40 pb-3">
-              <div className="flex justify-between items-center">
+              <div className="flex justify-between items-center flex-wrap gap-2">
                 <h2 className="text-sm font-bold uppercase tracking-widest text-slate-400">Risk Radar PvP</h2>
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-3">
+                  {/* Localizar Mapa (OCR) Switch */}
+                  <div className="flex items-center gap-2 bg-slate-900/60 border border-albion-border/30 px-2 py-1 rounded text-[10px] shadow-sm">
+                    <span className="text-slate-400 font-bold uppercase tracking-wider scale-95" title="Localizar mapa para aumentar supervivencia">
+                      📍 Localizar
+                    </span>
+                    <button
+                      onClick={toggleAutoMapDetection}
+                      className={`relative inline-flex h-4 w-8 shrink-0 cursor-pointer rounded-full border border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
+                        autoMapDetectionActive ? 'bg-amber-500' : 'bg-slate-700'
+                      }`}
+                    >
+                      <span
+                        className={`pointer-events-none inline-block h-3 w-3 transform rounded-full bg-slate-950 shadow transition duration-200 ease-in-out ${
+                          autoMapDetectionActive ? 'translate-x-4' : 'translate-x-0'
+                        }`}
+                      />
+                    </button>
+                  </div>
                   <span className="text-[10px] text-slate-500 font-mono">Auto-refresco: {refreshCountdown}s</span>
                   <button
                     onClick={() => fetchRadar(true)}
@@ -1746,6 +1852,26 @@ function App() {
                   {server.toUpperCase()} Server
                 </span>
               </div>
+
+              {/* Ubicación Actual Detectada (Clickable) */}
+              {autoMapDetectionActive && detectedMapName && (
+                <button
+                  type="button"
+                  onClick={handleSelectDetectedMap}
+                  className="mt-2 text-left bg-amber-500/10 hover:bg-amber-500/20 border border-albion-gold/45 hover:border-albion-gold/80 p-2.5 rounded-lg flex items-center justify-between text-xs transition-all duration-150 cursor-pointer group shadow-md animate-fadeIn"
+                >
+                  <div className="flex items-center gap-2">
+                    <span className="text-base animate-pulse">📍</span>
+                    <div>
+                      <span className="text-[9px] text-slate-400 font-bold uppercase tracking-wider block">Tu ubicación actual:</span>
+                      <span className="font-bold text-slate-200 group-hover:text-albion-gold transition-colors duration-150">{detectedMapName}</span>
+                    </div>
+                  </div>
+                  <span className="text-[10px] text-slate-400 bg-slate-900 border border-slate-800 px-2 py-0.5 rounded uppercase tracking-wider font-bold">
+                    Ver Detalles 👁️
+                  </span>
+                </button>
+              )}
             </div>
 
             {/* Buscador Inteligente y Filtros */}
@@ -1878,15 +2004,6 @@ function App() {
                 <label className="text-[10px] text-slate-400 font-bold uppercase tracking-widest block">
                   Mapas Analizados ({radarData ? radarData.zones.length : 0})
                 </label>
-                <button
-                  onClick={() => {
-                    refreshZonesList();
-                    setShowManageModal(true);
-                  }}
-                  className="px-2.5 py-1 bg-slate-900 border border-albion-border/80 hover:border-albion-gold text-slate-300 hover:text-albion-gold text-[10px] font-bold rounded transition flex items-center gap-1.5 cursor-pointer uppercase tracking-wider shadow-[0_0_8px_rgba(0,0,0,0.4)]"
-                >
-                  ⚙️ Gestionar Mapas
-                </button>
               </div>
 
               {radarLoading && !radarData && (
@@ -1977,7 +2094,7 @@ function App() {
                 <div className="border-b border-albion-border/60 pb-3.5 flex justify-between items-end">
                   <div>
                     <span className="text-[10px] font-bold text-amber-500 uppercase tracking-widest block">Análisis de Riesgo Local</span>
-                    <h2 className="text-xl font-bold text-slate-100 mt-0.5 font-display tracking-wide flex items-center gap-2.5">
+                    <h2 className="text-xl font-bold text-slate-100 mt-0.5 font-display tracking-wide flex items-center gap-2.5 flex-wrap">
                       {selectedZone.name}
                       <span className={`text-[10px] px-2 py-0.5 rounded font-sans font-bold border uppercase tracking-wider ${
                         selectedZone.risk_level === 'red' ? 'bg-red-500/10 text-red-400 border-red-500/30' :
@@ -1989,6 +2106,11 @@ function App() {
                          selectedZone.risk_level === 'orange' ? 'Peligroso' :
                          selectedZone.risk_level === 'yellow' ? 'Precaución' : 'Seguro'}
                       </span>
+                      {autoMapDetectionActive && detectedMapName.toLowerCase() === selectedZone.name.toLowerCase() && (
+                        <span className="bg-amber-500/20 text-albion-gold text-[9px] font-bold px-2.5 py-0.5 rounded border border-albion-gold/30 animate-pulse uppercase tracking-wider flex items-center gap-1 shadow-sm">
+                          👁️ Localizado (OCR)
+                        </span>
+                      )}
                     </h2>
                   </div>
                   <span className="text-slate-500 text-[10px] font-semibold uppercase font-sans tracking-widest">{selectedZone.type}</span>

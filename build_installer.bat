@@ -23,7 +23,7 @@ call npm run build || (
 cd ..
 
 echo [2/5] Instalando dependencias de Python necesarias...
-pip install pyinstaller requests pywebview pillow || (
+pip install pyinstaller requests pywebview pillow winrt-Windows.Media.Ocr winrt-Windows.Graphics.Imaging winrt-Windows.Storage winrt-Windows.Storage.Streams winrt-runtime pygetwindow || (
     echo ERROR: falló la instalación de dependencias de Python
     exit /b 1
 )
